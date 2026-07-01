@@ -43,3 +43,6 @@ desktop.ini
 
 # ---- Claude Code (machine-local settings) ----
 .claude/settings.local.json
+
+# ---- SafePath data cache (downloaded OSM graph + OSMnx HTTP cache; large, re-downloadable) ----
+data/cache/

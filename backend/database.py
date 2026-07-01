@@ -15,12 +15,15 @@ until a phase actually needs one.)
 
 import os
 from contextlib import contextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from psycopg2 import pool
 
-# Load variables from backend/.env into the process environment (no-op if absent).
-load_dotenv()
+# Load variables from backend/.env by explicit path, so config loads no matter
+# which working directory a script is launched from (uvicorn from backend/, the
+# data pipeline from the repo root, etc.). No-op if the file is absent.
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

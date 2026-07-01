@@ -66,3 +66,79 @@ def graph_stats():
         "total_length_km": round(total_km, 2),
         "total_length_miles": round(total_km * 0.621371, 2),
     }
+
+
+@app.get("/segment/{edge_id}/safety")
+def segment_safety(edge_id: int):
+    """Inspect one street segment's Phase 3 safety data: raw counts, normalized
+    0-1 scores, time-of-day incident densities, and the final safety weights.
+    (Verification aid for Phase 3 — not the real UI.)
+    """
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT e.u, e.v, e.length_m,
+                           s.crime_count, s.crime_day, s.crime_evening, s.crime_night,
+                           s.lamp_count, s.lamp_weight, s.outage_count,
+                           s.incident_density, s.incident_density_day,
+                           s.incident_density_evening, s.incident_density_night,
+                           s.lighting_score, s.has_lighting_data, s.outage_signal,
+                           s.safety_weight_day, s.safety_weight_evening,
+                           s.safety_weight_night, s.safety_weight_overall
+                    FROM road_edges e
+                    JOIN edge_safety s ON s.edge_id = e.id
+                    WHERE e.id = %s
+                    """,
+                    (edge_id,),
+                )
+                row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        raise HTTPException(
+            status_code=503,
+            detail="Safety scores not computed yet. Run data/compute_safety_scores.py first.",
+        )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"No scored segment with edge_id={edge_id}.")
+
+    (u, v, length_m, crime_count, crime_day, crime_evening, crime_night,
+     lamp_count, lamp_weight, outage_count, incident_density, incident_density_day,
+     incident_density_evening, incident_density_night, lighting_score,
+     has_lighting_data, outage_signal, sw_day, sw_evening, sw_night, sw_overall) = row
+
+    def r(x, n=4):
+        return round(x, n) if x is not None else None
+
+    return {
+        "edge_id": edge_id,
+        "u": u,
+        "v": v,
+        "length_m": r(length_m, 2),
+        "raw_counts": {
+            "crime_count": crime_count,
+            "crime_by_time": {"day": crime_day, "evening": crime_evening, "night": crime_night},
+            "lamp_count": lamp_count,
+            "lamp_weight": r(lamp_weight),
+            "outage_count": outage_count,
+        },
+        "normalized_scores": {
+            "incident_density": r(incident_density),
+            "lighting_score": r(lighting_score),
+            "has_lighting_data": has_lighting_data,
+            "on_neutral_lighting_fallback": not has_lighting_data,
+            "outage_signal": r(outage_signal),
+        },
+        "incident_density_by_time": {
+            "day": r(incident_density_day),
+            "evening": r(incident_density_evening),
+            "night": r(incident_density_night),
+        },
+        "safety_weight_by_time": {
+            "day": r(sw_day),
+            "evening": r(sw_evening),
+            "night": r(sw_night),
+            "overall": r(sw_overall),
+        },
+    }

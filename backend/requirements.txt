@@ -14,6 +14,9 @@ scipy==1.14.1
 redis==5.2.1
 psycopg2-binary==2.9.10
 
+# Async HTTP client for concurrent NYC Open Data / Overpass ingestion (Phase 2)
+httpx==0.28.1
+
 # Config + AI
 python-dotenv==1.0.1
 anthropic==0.42.0

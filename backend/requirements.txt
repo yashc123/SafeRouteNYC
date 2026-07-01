@@ -1,0 +1,19 @@
+# SafePath backend dependencies — pinned for reproducible builds (now and on AWS).
+# Web framework + ASGI server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Geospatial + routing (used in later phases)
+osmnx==2.0.1
+networkx==3.4.2
+geopandas==1.0.1
+shapely==2.0.6
+scipy==1.14.1
+
+# Infrastructure clients
+redis==5.2.1
+psycopg2-binary==2.9.10
+
+# Config + AI
+python-dotenv==1.0.1
+anthropic==0.42.0

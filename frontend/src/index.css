@@ -1,0 +1,22 @@
+/* Full-viewport map with zero margins/padding. */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+/* The map fills the entire viewport and stays pinned on resize. */
+.map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}

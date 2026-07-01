@@ -1,0 +1,37 @@
+# SafePath local infrastructure.
+# Phase 0: just the PostGIS database. Backend/Redis get containerized in later phases.
+
+services:
+  db:
+    # Pinned image tag (NOT "latest") so the database behaves identically on your
+    # machine now and on AWS later. Postgres 16 + PostGIS 3.4.
+    image: postgis/postgis:16-3.4
+    container_name: safepath-db
+    restart: unless-stopped
+
+    # Username and password come from backend/.env (POSTGRES_USER / POSTGRES_PASSWORD),
+    # never hardcoded here. The database name is fixed to "safepath" (not a secret).
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_DB: safepath
+
+    ports:
+      # Publish the standard Postgres port so the backend on the host can connect
+      # via DATABASE_URL (host: localhost, port: 5432).
+      - "5432:5432"
+
+    volumes:
+      # Named volume => data survives container restarts / recreation.
+      - safepath_pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      # Marks the container "healthy" only once Postgres is actually accepting
+      # connections. ($$ escapes the $ so the var is expanded inside the container.)
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d safepath"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  safepath_pgdata:

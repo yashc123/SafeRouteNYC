@@ -80,7 +80,8 @@ def segment_safety(edge_id: int):
                 cur.execute(
                     """
                     SELECT e.u, e.v, e.length_m,
-                           s.crime_count, s.crime_day, s.crime_evening, s.crime_night,
+                           s.crime_weight, s.crime_weight_day, s.crime_weight_evening,
+                           s.crime_weight_night,
                            s.lamp_count, s.lamp_weight, s.outage_count,
                            s.incident_density, s.incident_density_day,
                            s.incident_density_evening, s.incident_density_night,
@@ -103,10 +104,11 @@ def segment_safety(edge_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail=f"No scored segment with edge_id={edge_id}.")
 
-    (u, v, length_m, crime_count, crime_day, crime_evening, crime_night,
-     lamp_count, lamp_weight, outage_count, incident_density, incident_density_day,
-     incident_density_evening, incident_density_night, lighting_score,
-     has_lighting_data, outage_signal, sw_day, sw_evening, sw_night, sw_overall) = row
+    (u, v, length_m, crime_weight, crime_weight_day, crime_weight_evening,
+     crime_weight_night, lamp_count, lamp_weight, outage_count, incident_density,
+     incident_density_day, incident_density_evening, incident_density_night,
+     lighting_score, has_lighting_data, outage_signal,
+     sw_day, sw_evening, sw_night, sw_overall) = row
 
     def r(x, n=4):
         return round(x, n) if x is not None else None
@@ -117,8 +119,14 @@ def segment_safety(edge_id: int):
         "v": v,
         "length_m": r(length_m, 2),
         "raw_counts": {
-            "crime_count": crime_count,
-            "crime_by_time": {"day": crime_day, "evening": crime_evening, "night": crime_night},
+            # crime_weight is a fractional, distance-spread signal (each incident
+            # contributes a total of 1 across nearby segments), not an integer count.
+            "crime_weight": r(crime_weight, 3),
+            "crime_weight_by_time": {
+                "day": r(crime_weight_day, 3),
+                "evening": r(crime_weight_evening, 3),
+                "night": r(crime_weight_night, 3),
+            },
             "lamp_count": lamp_count,
             "lamp_weight": r(lamp_weight),
             "outage_count": outage_count,

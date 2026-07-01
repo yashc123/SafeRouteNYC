@@ -42,6 +42,15 @@ from database import get_connection
 # given OSM's sparse lamp coverage (~1 per 20 segments) — see the coverage report.
 LIGHTING_RADIUS_M = 40.0
 
+# Crime proximity-spreading radius. Unlike the lamp radius (physical illumination),
+# this corrects for NYPD's block-level coordinate TRUNCATION, which displaces an
+# incident by roughly a Manhattan block. Each incident is spread across segments
+# within this radius (distance-decay), with its weights normalized to sum to 1 so
+# the citywide crime signal is REDISTRIBUTED, not inflated. 65 m ~= one block of
+# positional uncertainty, wide enough to undo the truncation clustering without
+# bleeding crime across unrelated neighborhoods.
+CRIME_RADIUS_M = 65.0
+
 # Safety-weight term coefficients (w1, w2, w3 in the model):
 #   safety_weight = W_CRIME*incident_density - W_LIGHTING*lighting_score + W_OUTAGE*outage_signal
 # Higher weight = LESS safe (higher routing cost later). Lighting SUBTRACTS.
@@ -66,10 +75,10 @@ METRIC_SRID = 32618
 # matters most. Each bucket is normalized WITHIN itself, so "night density" is a
 # segment's relative risk among segments at night (not swamped by daytime volume).
 TIME_BUCKETS_SQL = """
-    count(*) FILTER (WHERE EXTRACT(HOUR FROM occurred_at) BETWEEN 6 AND 17)  AS crime_day,
-    count(*) FILTER (WHERE EXTRACT(HOUR FROM occurred_at) BETWEEN 18 AND 21) AS crime_evening,
-    count(*) FILTER (WHERE EXTRACT(HOUR FROM occurred_at) >= 22
-                        OR EXTRACT(HOUR FROM occurred_at) < 6)                AS crime_night
+    SUM(w) FILTER (WHERE EXTRACT(HOUR FROM occurred_at) BETWEEN 6 AND 17)  AS crime_weight_day,
+    SUM(w) FILTER (WHERE EXTRACT(HOUR FROM occurred_at) BETWEEN 18 AND 21) AS crime_weight_evening,
+    SUM(w) FILTER (WHERE EXTRACT(HOUR FROM occurred_at) >= 22
+                      OR EXTRACT(HOUR FROM occurred_at) < 6)                AS crime_weight_night
 """
 
 # =====================================================================
@@ -102,23 +111,20 @@ def ensure_projected_geometry(cur):
 
 
 def confirm_index_usage(cur):
-    """Print the query plan for the crime->nearest-segment join, so we can SEE the
-    spatial index (GiST KNN) is used rather than a sequential/brute-force scan.
+    """Print the query plan for the crime proximity (radius) join, so we can SEE the
+    spatial index (GiST on geom_m) is used rather than a brute-force scan.
     """
     cur.execute(
         """
         EXPLAIN
-        SELECT ne.edge_id
+        SELECT c.id, e.id
         FROM crime_incidents c
-        CROSS JOIN LATERAL (
-            SELECT e.id AS edge_id
-            FROM road_edges e
-            ORDER BY e.geom_m <-> c.geom_m
-            LIMIT 1
-        ) ne
-        """
+        JOIN road_edges e
+          ON ST_DWithin(e.geom_m, c.geom_m, %(radius)s)
+        """,
+        {"radius": CRIME_RADIUS_M},
     )
-    print("Query plan for crime -> nearest segment (look for a GiST Index Scan):")
+    print("Query plan for crime -> segments within radius (look for a GiST Index Scan):")
     for (line,) in cur.fetchall():
         print("   " + line)
 
@@ -126,20 +132,59 @@ def confirm_index_usage(cur):
 def build_edge_aggregates(cur):
     """Run the spatial joins and return a per-segment aggregate DataFrame (one row
     per edge, including edges with no nearby data)."""
-    # Crime assigned to its nearest segment (index-assisted KNN, one row per crime).
+    # --- Crime: proximity spreading with per-incident conservation ------------
+    # Step 1: every (incident, segment-within-CRIME_RADIUS_M) pair, with a linear
+    # distance-decay raw weight (1 on the segment -> ~0 at the radius edge). The
+    # weight is floored just above 0 so no incident can end up with a zero total.
+    # Uses the GiST index on road_edges.geom_m (index-assisted, not brute force).
     cur.execute(
         """
-        CREATE TEMP TABLE tmp_crime_edge ON COMMIT DROP AS
-        SELECT ne.edge_id, c.occurred_at
+        CREATE TEMP TABLE tmp_crime_seg ON COMMIT DROP AS
+        SELECT c.id AS crime_id, e.id AS edge_id, c.occurred_at,
+               GREATEST(1.0 - ST_Distance(e.geom_m, c.geom_m) / %(radius)s, 0.0001) AS w_raw
         FROM crime_incidents c
+        JOIN road_edges e
+          ON ST_DWithin(e.geom_m, c.geom_m, %(radius)s);
+        """,
+        {"radius": CRIME_RADIUS_M},
+    )
+    cur.execute("CREATE INDEX ON tmp_crime_seg (crime_id);")
+
+    # Step 2: fallback — incidents with NO segment within the radius get attached
+    # to their single nearest segment (raw weight 1), so nothing is dropped.
+    cur.execute(
+        """
+        CREATE TEMP TABLE tmp_crime_fallback ON COMMIT DROP AS
+        SELECT c.id AS crime_id, ne.edge_id, c.occurred_at, 1.0 AS w_raw
+        FROM crime_incidents c
+        LEFT JOIN (SELECT DISTINCT crime_id FROM tmp_crime_seg) hit
+          ON hit.crime_id = c.id
         CROSS JOIN LATERAL (
             SELECT e.id AS edge_id
             FROM road_edges e
             ORDER BY e.geom_m <-> c.geom_m
             LIMIT 1
-        ) ne;
+        ) ne
+        WHERE hit.crime_id IS NULL;
         """
     )
+
+    # Step 3: normalize each incident's weights to sum to 1 (redistribute, not
+    # inflate). After this, SUM(w) over ALL rows == number of incidents, and each
+    # incident's total contribution is exactly 1, split across its nearby segments.
+    cur.execute(
+        """
+        CREATE TEMP TABLE tmp_crime_weighted ON COMMIT DROP AS
+        SELECT crime_id, edge_id, occurred_at,
+               w_raw / SUM(w_raw) OVER (PARTITION BY crime_id) AS w
+        FROM (
+            SELECT crime_id, edge_id, occurred_at, w_raw FROM tmp_crime_seg
+            UNION ALL
+            SELECT crime_id, edge_id, occurred_at, w_raw FROM tmp_crime_fallback
+        ) u;
+        """
+    )
+
     # Outage reports assigned to their nearest segment.
     cur.execute(
         """
@@ -160,17 +205,17 @@ def build_edge_aggregates(cur):
         f"""
         SELECT
             e.id AS edge_id,
-            COALESCE(cr.crime_count, 0)   AS crime_count,
-            COALESCE(cr.crime_day, 0)     AS crime_day,
-            COALESCE(cr.crime_evening, 0) AS crime_evening,
-            COALESCE(cr.crime_night, 0)   AS crime_night,
+            COALESCE(cr.crime_weight, 0.0)         AS crime_weight,
+            COALESCE(cr.crime_weight_day, 0.0)     AS crime_weight_day,
+            COALESCE(cr.crime_weight_evening, 0.0) AS crime_weight_evening,
+            COALESCE(cr.crime_weight_night, 0.0)   AS crime_weight_night,
             COALESCE(lg.lamp_count, 0)    AS lamp_count,
             COALESCE(lg.lamp_weight, 0.0) AS lamp_weight,
             COALESCE(ou.outage_count, 0)  AS outage_count
         FROM road_edges e
         LEFT JOIN (
-            SELECT edge_id, count(*) AS crime_count, {TIME_BUCKETS_SQL}
-            FROM tmp_crime_edge GROUP BY edge_id
+            SELECT edge_id, SUM(w) AS crime_weight, {TIME_BUCKETS_SQL}
+            FROM tmp_crime_weighted GROUP BY edge_id
         ) cr ON cr.edge_id = e.id
         LEFT JOIN (
             -- Radius join: lamps within LIGHTING_RADIUS_M of a segment, with a
@@ -217,10 +262,10 @@ def _percentile_among_present(series):
 def compute_scores(df):
     """Normalize raw measures, apply the neutral lighting fallback, and combine
     into per-time safety weights."""
-    df["incident_density"]         = _percentile_among_present(df["crime_count"])
-    df["incident_density_day"]     = _percentile_among_present(df["crime_day"])
-    df["incident_density_evening"] = _percentile_among_present(df["crime_evening"])
-    df["incident_density_night"]   = _percentile_among_present(df["crime_night"])
+    df["incident_density"]         = _percentile_among_present(df["crime_weight"])
+    df["incident_density_day"]     = _percentile_among_present(df["crime_weight_day"])
+    df["incident_density_evening"] = _percentile_among_present(df["crime_weight_evening"])
+    df["incident_density_night"]   = _percentile_among_present(df["crime_weight_night"])
     df["outage_signal"]            = _percentile_among_present(df["outage_count"])
 
     # Lighting is the ETHICAL exception. Segments with no lamp in range are NOT
@@ -251,10 +296,10 @@ def compute_scores(df):
 EDGE_SAFETY_DDL = """
 CREATE TABLE IF NOT EXISTS edge_safety (
     edge_id                  BIGINT PRIMARY KEY REFERENCES road_edges(id),
-    crime_count              INTEGER NOT NULL,
-    crime_day                INTEGER NOT NULL,
-    crime_evening            INTEGER NOT NULL,
-    crime_night              INTEGER NOT NULL,
+    crime_weight             DOUBLE PRECISION NOT NULL,
+    crime_weight_day         DOUBLE PRECISION NOT NULL,
+    crime_weight_evening     DOUBLE PRECISION NOT NULL,
+    crime_weight_night       DOUBLE PRECISION NOT NULL,
     lamp_count               INTEGER NOT NULL,
     lamp_weight              DOUBLE PRECISION NOT NULL,
     outage_count             INTEGER NOT NULL,
@@ -273,8 +318,8 @@ CREATE TABLE IF NOT EXISTS edge_safety (
 """
 
 _INSERT_COLUMNS = [
-    "edge_id", "crime_count", "crime_day", "crime_evening", "crime_night",
-    "lamp_count", "lamp_weight", "outage_count",
+    "edge_id", "crime_weight", "crime_weight_day", "crime_weight_evening",
+    "crime_weight_night", "lamp_count", "lamp_weight", "outage_count",
     "incident_density", "incident_density_day", "incident_density_evening",
     "incident_density_night", "lighting_score", "has_lighting_data", "outage_signal",
     "safety_weight_day", "safety_weight_evening", "safety_weight_night",
@@ -283,9 +328,10 @@ _INSERT_COLUMNS = [
 
 
 def persist(cur, df):
-    """Idempotent truncate-and-reload of the precomputed weight store."""
+    """Idempotent rebuild of the precomputed weight store (drop + recreate so
+    schema changes take effect; it's a pure derived cache)."""
+    cur.execute("DROP TABLE IF EXISTS edge_safety;")
     cur.execute(EDGE_SAFETY_DDL)
-    cur.execute("TRUNCATE edge_safety;")
     # Build tuples of NATIVE python types (Series.tolist() converts numpy scalars).
     columns = {c: df[c].tolist() for c in _INSERT_COLUMNS}
     rows = list(zip(*[columns[c] for c in _INSERT_COLUMNS]))
@@ -297,19 +343,23 @@ def persist(cur, df):
     )
 
 
-def report_coverage(df):
+def report_coverage(df, n_incidents):
     n = len(df)
-    pct_crime = (df["crime_count"] > 0).mean() * 100
+    pct_crime = (df["crime_weight"] > 0).mean() * 100
     pct_light = df["has_lighting_data"].mean() * 100
     pct_outage = (df["outage_count"] > 0).mean() * 100
+    total_weight = df["crime_weight"].sum()
 
     print("\n===== PHASE 3 COVERAGE REPORT =====")
     print(f"Total segments scored: {n:,}")
-    print(f"  % with crime data (>=1 incident on nearest-segment): {pct_crime:5.1f}%")
+    print(f"  % with crime signal (crime_weight > 0, {CRIME_RADIUS_M:.0f} m spread): {pct_crime:5.1f}%")
     print(f"  % with lighting data (>=1 lamp within {LIGHTING_RADIUS_M:.0f} m, "
           f"i.e. NOT on neutral fallback): {pct_light:5.1f}%")
     print(f"  % with outage signal (>=1 report):                   {pct_outage:5.1f}%")
     print(f"Segments on the neutral lighting fallback (0.5):       {100 - pct_light:5.1f}%")
+    print("  --- crime conservation (redistributed, not inflated) ---")
+    print(f"  SUM(crime_weight) = {total_weight:,.2f}   incidents = {n_incidents:,}   "
+          f"diff = {total_weight - n_incidents:+.2f}")
     print("===================================\n")
 
 
@@ -322,7 +372,7 @@ def main():
 
             confirm_index_usage(cur)
 
-            print("\nRunning spatial joins (crime/outages KNN, lamps radius join)...")
+            print("\nRunning spatial joins (crime radius spread, outages KNN, lamps radius join)...")
             df = build_edge_aggregates(cur)
             print(f"Aggregated {len(df):,} segments.")
 
@@ -332,7 +382,10 @@ def main():
             persist(cur, df)
             conn.commit()
 
-    report_coverage(df)
+            cur.execute("SELECT count(*) FROM crime_incidents;")
+            n_incidents = cur.fetchone()[0]
+
+    report_coverage(df, n_incidents)
     print(f"Done in {time.time() - t0:.1f}s.")
 
 

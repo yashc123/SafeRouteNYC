@@ -64,6 +64,12 @@ DEFAULT_BUDGET_MIN = 15.0
 # 2 hops ≈ the tapped block plus the immediately adjacent blocks.
 AREA_KRING = 2
 
+# A tapped point is "off the covered network" when its nearest street node is
+# farther than this. ~200 m comfortably exceeds Manhattan's longest half-block
+# (~137 m, mid-avenue-block), so valid on-street taps pass, while taps in the
+# rivers or other boroughs (300 m+ from any Manhattan street) are rejected.
+COVERAGE_MAX_SNAP_M = 200.0
+
 # Concave-hull tightness for turning reached nodes into a region. shapely's ratio
 # is in [0, 1]: 1 == convex hull (simple but overstates reach, bridging across
 # unreachable pockets); lower == more concave, hugging the true reachable extent.
@@ -154,11 +160,27 @@ class Router:
         self.ready = True
 
     # -- snapping ------------------------------------------------------------
+    def snap_distance(self, lat, lng):
+        """Nearest graph node AND the distance (meters) from the point to it. The
+        KD-tree is in projected meters, so query() returns the distance directly."""
+        x, y = self._proj.transform(lng, lat)
+        dist, idx = self._tree.query([x, y])
+        return self.node_ids[idx], float(dist)
+
     def snap(self, lat, lng):
         """Snap an arbitrary lat/lng to the nearest graph node (O(log n) via KD-tree)."""
-        x, y = self._proj.transform(lng, lat)
-        _, idx = self._tree.query([x, y])
-        return self.node_ids[idx]
+        node, _ = self.snap_distance(lat, lng)
+        return node
+
+    def coverage(self, lat, lng):
+        """Whether a point falls within the covered Manhattan street network, judged
+        by how far the nearest street node is (see COVERAGE_MAX_SNAP_M)."""
+        node, dist = self.snap_distance(lat, lng)
+        return {
+            "in_bounds": dist <= COVERAGE_MAX_SNAP_M,
+            "distance_m": round(dist, 1),
+            "snapped": {"lat": self.coords[node][1], "lng": self.coords[node][0]},
+        }
 
     # -- A* heuristic --------------------------------------------------------
     def _heuristic(self, u, target):

@@ -298,6 +298,16 @@ def area_safety(
     return router.area_safety(lat, lng, tod)
 
 
+@app.get("/coverage")
+def coverage(lat: float = Query(ge=-90, le=90), lng: float = Query(ge=-180, le=180)):
+    """Is a point within the covered Manhattan street network? Returns
+    {in_bounds, distance_m, snapped}. The frontend calls this to reject
+    out-of-bounds map clicks/taps gracefully.
+    """
+    _require_ready()
+    return router.coverage(lat, lng)
+
+
 class AgentRequest(BaseModel):
     message: str
     history: list | None = None

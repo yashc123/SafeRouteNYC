@@ -33,6 +33,20 @@ export async function fetchAreaSafety({ lat, lng, timeOfDay }) {
   return res.json()
 }
 
+// GET /coverage — is a point within the covered Manhattan street network?
+// Fails OPEN (returns in_bounds:true) if the check itself errors, so a coverage
+// hiccup never blocks a legitimate click.
+export async function checkCoverage({ lat, lng }) {
+  try {
+    const params = new URLSearchParams({ lat: String(lat), lng: String(lng) })
+    const res = await fetch(`${API_URL}/coverage?${params.toString()}`)
+    if (!res.ok) return { in_bounds: true }
+    return res.json()
+  } catch {
+    return { in_bounds: true }
+  }
+}
+
 // POST /agent — natural-language request. Returns { answer, route, area,
 // reachable, history }. route/area are the same shapes the map already draws.
 export async function postAgent({ message, history }) {

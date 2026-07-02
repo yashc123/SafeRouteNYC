@@ -2,7 +2,14 @@ import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-import { MAP_STYLE, MANHATTAN_CENTER, INITIAL_ZOOM, MARKER_COLORS } from '../config'
+import {
+  MAP_STYLE,
+  MANHATTAN_CENTER,
+  INITIAL_ZOOM,
+  MARKER_COLORS,
+  MAP_MAX_BOUNDS,
+  MAP_MIN_ZOOM,
+} from '../config'
 import {
   ensureRouteLayers,
   setRouteData,
@@ -69,6 +76,8 @@ export default function MapView({
       style: MAP_STYLE,
       center: MANHATTAN_CENTER,
       zoom: INITIAL_ZOOM,
+      maxBounds: MAP_MAX_BOUNDS, // can't pan away from Manhattan
+      minZoom: MAP_MIN_ZOOM, // can't zoom out and lose the island
     })
     mapRef.current = map
 

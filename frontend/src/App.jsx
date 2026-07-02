@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import MapView from './components/MapView'
 import Legend from './components/Legend'
 import StatusPill from './components/StatusPill'
@@ -11,6 +11,7 @@ import AgentPanel from './components/AgentPanel'
 import { useRouting } from './hooks/useRouting'
 import { useExplore } from './hooks/useExplore'
 import { useAgent } from './hooks/useAgent'
+import { checkCoverage } from './lib/api'
 
 // Phase 7.5: adds a Route/Explore mode toggle. Route mode = the full routing app.
 // Explore mode = tap the map to see an area's safety. Both share the time-of-day
@@ -64,6 +65,34 @@ export default function App() {
   }
   const agent = useAgent(handleAgentResult)
 
+  // Out-of-bounds toast (brief, friendly) for clicks off the Manhattan network.
+  const [outOfBounds, setOutOfBounds] = useState(false)
+  const oobTimerRef = useRef()
+  const flashOutOfBounds = useCallback(() => {
+    setOutOfBounds(true)
+    clearTimeout(oobTimerRef.current)
+    oobTimerRef.current = setTimeout(() => setOutOfBounds(false), 4000)
+  }, [])
+
+  // Validate a map click against the covered network before acting on it. Applies
+  // to both Route (set origin/destination) and Explore (area lookup) taps.
+  const handleRouteClick = useCallback(
+    async (lngLat) => {
+      const cov = await checkCoverage({ lat: lngLat.lat, lng: lngLat.lng })
+      if (cov.in_bounds === false) return flashOutOfBounds()
+      handleMapClick(lngLat)
+    },
+    [handleMapClick, flashOutOfBounds],
+  )
+  const handleExploreClick = useCallback(
+    async (lngLat) => {
+      const cov = await checkCoverage({ lat: lngLat.lat, lng: lngLat.lng })
+      if (cov.in_bounds === false) return flashOutOfBounds()
+      explore.explore({ lat: lngLat.lat, lng: lngLat.lng })
+    },
+    [explore, flashOutOfBounds],
+  )
+
   const inRoute = mode === 'route'
 
   return (
@@ -75,10 +104,16 @@ export default function App() {
         routes={routes}
         explorePoint={explore.point}
         exploreArea={explore.area}
-        onMapClick={handleMapClick}
+        onMapClick={handleRouteClick}
         onSegmentClick={setSelectedSegment}
-        onExploreClick={(lngLat) => explore.explore({ lat: lngLat.lat, lng: lngLat.lng })}
+        onExploreClick={handleExploreClick}
       />
+
+      {outOfBounds && (
+        <div className="oob-toast">
+          SafePath currently covers Manhattan — please pick a point on the island.
+        </div>
+      )}
 
       <div className="left-stack">
         <ControlPanel

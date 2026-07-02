@@ -619,3 +619,23 @@ body {
 .route-here-btn:hover {
   background: #5fe3d3;
 }
+
+/* Out-of-bounds toast: brief, friendly, top-center. Info-only. */
+.oob-toast {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  max-width: calc(100vw - 40px);
+  padding: 8px 15px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 12.5px;
+  color: #e8eaed;
+  background: rgba(30, 32, 40, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+}

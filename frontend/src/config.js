@@ -14,6 +14,15 @@ export const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2-dark/style.js
 export const MANHATTAN_CENTER = [-73.97, 40.78]
 export const INITIAL_ZOOM = 12
 
+// Keep the map on Manhattan. maxBounds ([SW, NE]) is a Manhattan bbox with ~2-3 km
+// of breathing room on each side so the island's edges aren't cut off; minZoom
+// stops the user zooming out until Manhattan is lost in the wider region.
+export const MAP_MAX_BOUNDS = [
+  [-74.05, 40.68],
+  [-73.88, 40.89],
+]
+export const MAP_MIN_ZOOM = 11
+
 // Route styling — muted gray for the fast route, confident teal for the safe one.
 export const ROUTE_COLORS = {
   fast: '#8a9199',

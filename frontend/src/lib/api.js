@@ -33,6 +33,20 @@ export async function fetchAreaSafety({ lat, lng, timeOfDay }) {
   return res.json()
 }
 
+// POST /agent — natural-language request. Returns { answer, route, area,
+// reachable, history }. route/area are the same shapes the map already draws.
+export async function postAgent({ message, history }) {
+  const res = await fetch(`${API_URL}/agent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history: history || null }),
+  })
+  if (!res.ok) {
+    throw await errorFrom(res)
+  }
+  return res.json()
+}
+
 // Surface the backend's error detail when present, else a generic message.
 async function errorFrom(res) {
   let message = `Request failed (HTTP ${res.status})`

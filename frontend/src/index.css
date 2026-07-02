@@ -99,6 +99,7 @@ body {
 /* Shared dark-card look for the left-stack cards + the segment detail panel. */
 .control-panel,
 .breakdown-card,
+.agent-panel,
 .segment-detail {
   padding: 14px;
   box-sizing: border-box;
@@ -112,8 +113,65 @@ body {
 }
 
 .control-panel,
-.breakdown-card {
+.breakdown-card,
+.agent-panel {
   width: 100%;
+}
+
+/* Natural-language agent box. */
+.agent-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 9px;
+  padding: 8px 9px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: #e8eaed;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+}
+
+.agent-input::placeholder {
+  color: #7a8087;
+}
+
+.agent-input:focus {
+  border-color: rgba(45, 212, 191, 0.5);
+}
+
+.agent-submit {
+  margin-top: 8px;
+  align-self: flex-start;
+  padding: 6px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0b1418;
+  background: #2dd4bf;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.agent-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.agent-answer {
+  margin: 11px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #e8eaed;
+  white-space: pre-wrap;
 }
 
 .control-section + .control-section {

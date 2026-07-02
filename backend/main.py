@@ -20,6 +20,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from agent import agent_available, run_agent
 from cache import cache, reachable_key, route_key
 from database import get_connection
 from routing import DEFAULT_BUDGET_MIN, DEFAULT_SAFE_ALPHA, VALID_TIMES, router
@@ -295,3 +296,38 @@ def area_safety(
     _require_ready()
     tod = _validate_time(time_of_day)
     return router.area_safety(lat, lng, tod)
+
+
+class AgentRequest(BaseModel):
+    message: str
+    history: list | None = None
+
+
+@app.post("/agent")
+def agent(req: AgentRequest):
+    """Natural-language agent: a single Claude tool-using agent that orchestrates
+    the routing engine via tools. Returns the grounded text answer plus any
+    structured route/area data it produced (so the frontend can draw it).
+    """
+    _require_ready()
+    if not agent_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Agent unavailable: set ANTHROPIC_API_KEY in backend/.env and restart.",
+        )
+    if not req.message or not req.message.strip():
+        raise HTTPException(status_code=422, detail="message must not be empty.")
+
+    try:
+        result = run_agent(req.message.strip(), req.history)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Agent error: {exc}")
+
+    artifacts = result["artifacts"]
+    return {
+        "answer": result["answer"],
+        "route": artifacts.get("route"),
+        "area": artifacts.get("area"),
+        "reachable": artifacts.get("reachable"),
+        "history": result["history"],
+    }

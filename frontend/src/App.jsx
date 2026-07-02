@@ -7,8 +7,10 @@ import RouteCards from './components/RouteCards'
 import RouteBreakdown from './components/RouteBreakdown'
 import SegmentDetail from './components/SegmentDetail'
 import AreaCard from './components/AreaCard'
+import AgentPanel from './components/AgentPanel'
 import { useRouting } from './hooks/useRouting'
 import { useExplore } from './hooks/useExplore'
+import { useAgent } from './hooks/useAgent'
 
 // Phase 7.5: adds a Route/Explore mode toggle. Route mode = the full routing app.
 // Explore mode = tap the map to see an area's safety. Both share the time-of-day
@@ -45,6 +47,23 @@ export default function App() {
     setMode('route')
   }
 
+  // When the agent produces a route or area, draw it via the EXISTING flow: set the
+  // routing/explore inputs and let the app re-run + render it (no duplicate logic).
+  const handleAgentResult = (res) => {
+    const safe = res.route?.safe
+    if (safe?.snapped_origin && safe?.snapped_destination) {
+      setMode('route')
+      setAlpha(res.route.safe_alpha)
+      setTimeOfDay(res.route.time_of_day)
+      setOriginPoint(safe.snapped_origin)
+      setDestinationPoint(safe.snapped_destination)
+    } else if (res.area?.snapped) {
+      setMode('explore')
+      explore.explore({ lat: res.area.snapped.lat, lng: res.area.snapped.lng })
+    }
+  }
+  const agent = useAgent(handleAgentResult)
+
   const inRoute = mode === 'route'
 
   return (
@@ -73,6 +92,12 @@ export default function App() {
           onTimeChange={setTimeOfDay}
           onOriginSelect={setOriginPoint}
           onDestinationSelect={setDestinationPoint}
+        />
+        <AgentPanel
+          onAsk={agent.ask}
+          loading={agent.loading}
+          answer={agent.answer}
+          error={agent.error}
         />
         {inRoute && routes && <RouteBreakdown safe={routes.safe} />}
       </div>

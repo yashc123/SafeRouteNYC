@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
+import SearchField from './SearchField'
 import {
   SLIDER_DEBOUNCE_MS,
   TIME_OF_DAY_OPTIONS,
+  MARKER_COLORS,
   alphaToSlider,
   sliderToAlpha,
 } from '../config'
 
-// Compact control card: safety-vs-speed slider + time-of-day selector. It only
-// calls the routing setters passed in (onAlphaChange / onTimeChange); it never
-// touches the map. Structured so later sub-steps can add more sections here.
-export default function ControlPanel({ alpha, timeOfDay, onAlphaChange, onTimeChange }) {
+// Compact control card: address search + safety-vs-speed slider + time-of-day
+// selector. It only calls the setters passed in; it never touches the map.
+export default function ControlPanel({
+  alpha,
+  timeOfDay,
+  origin,
+  destination,
+  onAlphaChange,
+  onTimeChange,
+  onOriginSelect,
+  onDestinationSelect,
+}) {
   // Local slider position for smooth dragging; the committed alpha is debounced.
   const [slider, setSlider] = useState(() => alphaToSlider(alpha))
 
@@ -22,6 +32,22 @@ export default function ControlPanel({ alpha, timeOfDay, onAlphaChange, onTimeCh
 
   return (
     <div className="control-panel">
+      <section className="control-section">
+        <span className="control-label">Route</span>
+        <SearchField
+          color={MARKER_COLORS.origin}
+          placeholder="Start address"
+          endpoint={origin}
+          onSelect={onOriginSelect}
+        />
+        <SearchField
+          color={MARKER_COLORS.destination}
+          placeholder="Destination address"
+          endpoint={destination}
+          onSelect={onDestinationSelect}
+        />
+      </section>
+
       <section className="control-section">
         <label className="control-label" htmlFor="safety-slider">
           Route priority

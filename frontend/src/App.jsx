@@ -23,6 +23,8 @@ export default function App() {
     handleMapClick,
     setAlpha,
     setTimeOfDay,
+    setOriginPoint,
+    setDestinationPoint,
   } = useRouting()
 
   const [selectedSegment, setSelectedSegment] = useState(null)
@@ -46,8 +48,12 @@ export default function App() {
         <ControlPanel
           alpha={alpha}
           timeOfDay={timeOfDay}
+          origin={origin}
+          destination={destination}
           onAlphaChange={setAlpha}
           onTimeChange={setTimeOfDay}
+          onOriginSelect={setOriginPoint}
+          onDestinationSelect={setDestinationPoint}
         />
         {routes && <RouteBreakdown safe={routes.safe} />}
       </div>

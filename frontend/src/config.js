@@ -27,6 +27,18 @@ export const COMPONENT_COLORS = {
   incidents: '#e0a458',
 }
 
+// Marker colors (also used by the search-field dots so they match the map).
+export const MARKER_COLORS = {
+  origin: '#22c55e', // green
+  destination: '#ef4444', // red
+}
+
+// Geocoding bias to Manhattan/NYC: bbox restricts results to the routable area,
+// proximity ranks results nearest the center first. [minLon, minLat, maxLon, maxLat].
+export const GEOCODE_BBOX = [-74.03, 40.698, -73.9, 40.882]
+export const GEOCODE_PROXIMITY = [-73.97, 40.78]
+export const GEOCODE_DEBOUNCE_MS = 300
+
 // Safety-vs-speed slider -> alpha mapping.
 // The slider is 0..100; alpha is 0..ALPHA_MAX. Max 10 because testing showed
 // alpha 3-8 gives the useful safe detours; 10 makes the "Safest" end decisive

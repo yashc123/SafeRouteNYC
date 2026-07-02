@@ -36,6 +36,19 @@ export function useRouting() {
     [origin, destination],
   )
 
+  // Direct setters used by the address search. They feed the SAME state as
+  // handleMapClick, so search and click never diverge: the fetch effect below
+  // fires as soon as both endpoints exist, regardless of how they were set.
+  const setOriginPoint = useCallback((point) => {
+    setError(null)
+    setOrigin(point)
+  }, [])
+
+  const setDestinationPoint = useCallback((point) => {
+    setError(null)
+    setDestination(point)
+  }, [])
+
   const reset = useCallback(() => {
     setOrigin(null)
     setDestination(null)
@@ -78,5 +91,7 @@ export function useRouting() {
     reset,
     setAlpha,
     setTimeOfDay,
+    setOriginPoint,
+    setDestinationPoint,
   }
 }

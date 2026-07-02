@@ -21,7 +21,10 @@ export const MAP_MAX_BOUNDS = [
   [-74.05, 40.68],
   [-73.88, 40.89],
 ]
-export const MAP_MIN_ZOOM = 11
+// z10 fits Manhattan end-to-end (~21 km N-S) in one frame WITH room for fitBounds
+// padding on a long cross-island route, while the island still fills ~half the view
+// (z9 would show the whole metro and lose the focus). maxBounds keeps panning tight.
+export const MAP_MIN_ZOOM = 10
 
 // Route styling — muted gray for the fast route, confident teal for the safe one.
 export const ROUTE_COLORS = {

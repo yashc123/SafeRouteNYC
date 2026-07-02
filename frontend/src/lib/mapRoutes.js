@@ -54,13 +54,16 @@ export function clearRouteData(map) {
 }
 
 // Fit the viewport so every coordinate of the given geometries is visible.
+// padding keeps the route off the edges; maxZoom stops a very short route from
+// zooming in absurdly; the eased duration (with minZoom now low enough to reach
+// the target) frames even a full-island route smoothly, without clamp glitches.
 export function fitToRoutes(map, geometries) {
   const bounds = new maplibregl.LngLatBounds()
   for (const geometry of geometries) {
     for (const coord of geometry.coordinates) bounds.extend(coord)
   }
   if (!bounds.isEmpty()) {
-    map.fitBounds(bounds, { padding: 80, duration: 700 })
+    map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 600 })
   }
 }
 

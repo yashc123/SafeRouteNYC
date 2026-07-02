@@ -156,3 +156,119 @@ body {
   border-color: #2dd4bf;
   font-weight: 600;
 }
+
+/* Route comparison cards, bottom-center. Interactive surface (captures clicks so
+   reading them doesn't drop a marker). */
+.route-cards {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+  max-width: calc(100vw - 28px);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.route-card {
+  min-width: 150px;
+  padding: 11px 14px 12px;
+  color: #e8eaed;
+  background: rgba(20, 22, 28, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+}
+
+/* Safe = recommendation: teal accent, brighter, slightly larger. */
+.route-card.safe {
+  border-color: rgba(45, 212, 191, 0.5);
+  background: rgba(17, 30, 30, 0.92);
+}
+
+/* Fast = secondary: muted. */
+.route-card.fast {
+  opacity: 0.9;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+
+.card-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+
+.card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.card-tag {
+  margin-left: auto;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #0b1418;
+  background: #2dd4bf;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.card-stats {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 9px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.stat-label {
+  margin-top: 3px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9aa0a6;
+}
+
+.card-safety {
+  font-size: 12.5px;
+  color: #c8ccd0;
+}
+
+.card-safety strong {
+  font-size: 14px;
+  color: #e8eaed;
+}
+
+/* Emphasize the safe route's safety number in teal. */
+.route-card.safe .card-safety strong {
+  color: #2dd4bf;
+}
+
+/* Stack on narrow screens. */
+@media (max-width: 520px) {
+  .route-cards {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

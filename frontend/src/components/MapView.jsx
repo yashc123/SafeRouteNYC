@@ -14,6 +14,7 @@ export default function MapView({ origin, destination, routes, onMapClick }) {
   const readyRef = useRef(false)
   const originMarkerRef = useRef(null)
   const destMarkerRef = useRef(null)
+  const lastFitKeyRef = useRef(null)
 
   // Keep the latest click handler in a ref so the once-registered map listener
   // always calls the current version (which closes over current state).
@@ -79,15 +80,25 @@ export default function MapView({ origin, destination, routes, onMapClick }) {
     }
   }, [destination])
 
-  // Routes: draw both and fit the view; clear when routes go away.
+  // Routes: draw both; clear when routes go away. Only fit the view when the
+  // endpoint PAIR changes (a new route request) — not on slider/time re-routes,
+  // which would make the map jump while the user is tuning. We key the fit off
+  // the route's snapped endpoints.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
     if (routes?.fast?.geometry && routes?.safe?.geometry) {
       setRouteData(map, routes.fast.geometry, routes.safe.geometry)
-      fitToRoutes(map, [routes.fast.geometry, routes.safe.geometry])
+      const so = routes.safe.snapped_origin
+      const sd = routes.safe.snapped_destination
+      const fitKey = `${so.lat},${so.lng}->${sd.lat},${sd.lng}`
+      if (fitKey !== lastFitKeyRef.current) {
+        fitToRoutes(map, [routes.fast.geometry, routes.safe.geometry])
+        lastFitKeyRef.current = fitKey
+      }
     } else {
       clearRouteData(map)
+      lastFitKeyRef.current = null
     }
   }, [routes])
 

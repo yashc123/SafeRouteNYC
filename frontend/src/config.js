@@ -19,3 +19,19 @@ export const ROUTE_COLORS = {
   fast: '#8a9199',
   safe: '#2dd4bf',
 }
+
+// Safety-vs-speed slider -> alpha mapping.
+// The slider is 0..100; alpha is 0..ALPHA_MAX. Max 10 because testing showed
+// alpha 3-8 gives the useful safe detours; 10 makes the "Safest" end decisive
+// without absurd detours (beyond ~10 paths barely change). Default alpha 3
+// matches the backend default (slider at 30%).
+export const ALPHA_MAX = 10
+export const DEFAULT_ALPHA = 3
+export const DEFAULT_TIME_OF_DAY = 'night'
+export const TIME_OF_DAY_OPTIONS = ['day', 'evening', 'night']
+
+// Wait this long after the user stops sliding before firing a /route request.
+export const SLIDER_DEBOUNCE_MS = 350
+
+export const sliderToAlpha = (value) => Math.round((value / 100) * ALPHA_MAX * 100) / 100
+export const alphaToSlider = (alpha) => Math.round((alpha / ALPHA_MAX) * 100)

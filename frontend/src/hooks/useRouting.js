@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { postRoute } from '../lib/api'
+import { DEFAULT_ALPHA, DEFAULT_TIME_OF_DAY } from '../config'
 
 // Owns the click-to-route state so components (and later sub-steps' controls) can
 // read/drive it. State machine on each map click:
@@ -13,6 +14,10 @@ export function useRouting() {
   const [routes, setRoutes] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  // Routing params driven by the control panel. These persist across a reset
+  // (they're user preferences, not tied to a specific origin/destination).
+  const [alpha, setAlpha] = useState(DEFAULT_ALPHA)
+  const [timeOfDay, setTimeOfDay] = useState(DEFAULT_TIME_OF_DAY)
 
   const handleMapClick = useCallback(
     (lngLat) => {
@@ -38,13 +43,15 @@ export function useRouting() {
     setError(null)
   }, [])
 
-  // Fetch the route whenever both endpoints are set.
+  // Fetch the route whenever both endpoints are set OR a routing param changes
+  // (alpha / time_of_day). The guard means control changes with no endpoints set
+  // don't fire a pointless request.
   useEffect(() => {
     if (!origin || !destination) return
     let cancelled = false
     setLoading(true)
     setError(null)
-    postRoute({ origin, destination })
+    postRoute({ origin, destination, alpha, timeOfDay })
       .then((data) => {
         if (!cancelled) setRoutes(data)
       })
@@ -57,7 +64,19 @@ export function useRouting() {
     return () => {
       cancelled = true
     }
-  }, [origin, destination])
+  }, [origin, destination, alpha, timeOfDay])
 
-  return { origin, destination, routes, loading, error, handleMapClick, reset }
+  return {
+    origin,
+    destination,
+    routes,
+    loading,
+    error,
+    alpha,
+    timeOfDay,
+    handleMapClick,
+    reset,
+    setAlpha,
+    setTimeOfDay,
+  }
 }

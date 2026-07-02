@@ -81,3 +81,78 @@ body {
   border-radius: 2px;
   display: inline-block;
 }
+
+/* Control panel, top-left. Interactive, so (unlike the overlays above) it DOES
+   capture pointer events. Structured as stacked sections for future controls. */
+.control-panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  width: 236px;
+  padding: 14px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #e8eaed;
+  background: rgba(20, 22, 28, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+}
+
+.control-section + .control-section {
+  margin-top: 16px;
+}
+
+.control-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #9aa0a6;
+  margin-bottom: 9px;
+}
+
+.safety-slider {
+  width: 100%;
+  margin: 0;
+  accent-color: #2dd4bf; /* themes the native range track/thumb, dark-friendly */
+  cursor: pointer;
+}
+
+.slider-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #9aa0a6;
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+}
+
+.segment {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: #c8ccd0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segment:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.segment.active {
+  background: #2dd4bf;
+  color: #0b1418;
+  border-color: #2dd4bf;
+  font-weight: 600;
+}

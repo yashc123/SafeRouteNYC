@@ -1,14 +1,25 @@
 import MapView from './components/MapView'
 import Legend from './components/Legend'
 import StatusPill from './components/StatusPill'
+import ControlPanel from './components/ControlPanel'
 import { useRouting } from './hooks/useRouting'
 
-// Sub-step 1: click origin/destination -> POST /route -> draw safe + fast routes.
-// Routing state lives in the useRouting hook; MapView renders it onto the map;
-// Legend and StatusPill are simple overlays. Later sub-steps add controls that
-// hook into this same state.
+// Sub-step 2: adds the safety-vs-speed slider + time-of-day selector. Routing
+// state (incl. alpha / time_of_day) lives in useRouting; ControlPanel drives the
+// setters; MapView still just reacts to `routes`.
 export default function App() {
-  const { origin, destination, routes, loading, error, handleMapClick } = useRouting()
+  const {
+    origin,
+    destination,
+    routes,
+    loading,
+    error,
+    alpha,
+    timeOfDay,
+    handleMapClick,
+    setAlpha,
+    setTimeOfDay,
+  } = useRouting()
 
   return (
     <>
@@ -17,6 +28,12 @@ export default function App() {
         destination={destination}
         routes={routes}
         onMapClick={handleMapClick}
+      />
+      <ControlPanel
+        alpha={alpha}
+        timeOfDay={timeOfDay}
+        onAlphaChange={setAlpha}
+        onTimeChange={setTimeOfDay}
       />
       <StatusPill origin={origin} destination={destination} loading={loading} error={error} />
       <Legend />

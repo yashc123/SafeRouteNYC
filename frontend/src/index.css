@@ -479,3 +479,85 @@ body {
   background: rgba(45, 212, 191, 0.15);
   border: 1px solid rgba(45, 212, 191, 0.3);
 }
+
+/* --- Explore mode (Phase 7.5) --- */
+.mode-toggle {
+  margin-bottom: 14px;
+}
+
+.explore-hint {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #9aa0a6;
+}
+
+/* Area safety card, bottom-center (like the route cards). */
+.area-card {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: 262px;
+  max-width: calc(100vw - 28px);
+  box-sizing: border-box;
+  padding: 13px 15px 14px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #e8eaed;
+  background: rgba(20, 22, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.area-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.area-score-num {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: #e8eaed; /* neutral — not colored good/bad, to stay non-alarmist */
+}
+
+.area-score-max {
+  font-size: 13px;
+  color: #9aa0a6;
+}
+
+.area-label {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #e8eaed;
+}
+
+.area-loading {
+  margin: 6px 0;
+  font-size: 12.5px;
+  color: #9aa0a6;
+}
+
+.route-here-btn {
+  margin-top: 13px;
+  width: 100%;
+  padding: 8px 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0b1418;
+  background: #2dd4bf;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.route-here-btn:hover {
+  background: #5fe3d3;
+}

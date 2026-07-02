@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import SearchField from './SearchField'
+import ModeToggle from './ModeToggle'
 import {
   SLIDER_DEBOUNCE_MS,
   TIME_OF_DAY_OPTIONS,
@@ -8,13 +9,16 @@ import {
   sliderToAlpha,
 } from '../config'
 
-// Compact control card: address search + safety-vs-speed slider + time-of-day
-// selector. It only calls the setters passed in; it never touches the map.
+// Compact control card. Mode toggle on top. In Route mode: address search +
+// safety-vs-speed slider. Both modes: time-of-day selector (area safety is
+// time-dependent too). It only calls the setters passed in; never touches the map.
 export default function ControlPanel({
+  mode,
   alpha,
   timeOfDay,
   origin,
   destination,
+  onModeChange,
   onAlphaChange,
   onTimeChange,
   onOriginSelect,
@@ -32,40 +36,46 @@ export default function ControlPanel({
 
   return (
     <div className="control-panel">
-      <section className="control-section">
-        <span className="control-label">Route</span>
-        <SearchField
-          color={MARKER_COLORS.origin}
-          placeholder="Start address"
-          endpoint={origin}
-          onSelect={onOriginSelect}
-        />
-        <SearchField
-          color={MARKER_COLORS.destination}
-          placeholder="Destination address"
-          endpoint={destination}
-          onSelect={onDestinationSelect}
-        />
-      </section>
+      <ModeToggle mode={mode} onChange={onModeChange} />
 
-      <section className="control-section">
-        <label className="control-label" htmlFor="safety-slider">
-          Route priority
-        </label>
-        <input
-          id="safety-slider"
-          className="safety-slider"
-          type="range"
-          min="0"
-          max="100"
-          value={slider}
-          onChange={(e) => setSlider(Number(e.target.value))}
-        />
-        <div className="slider-ends">
-          <span>Fastest</span>
-          <span>Safest</span>
-        </div>
-      </section>
+      {mode === 'route' && (
+        <>
+          <section className="control-section">
+            <span className="control-label">Route</span>
+            <SearchField
+              color={MARKER_COLORS.origin}
+              placeholder="Start address"
+              endpoint={origin}
+              onSelect={onOriginSelect}
+            />
+            <SearchField
+              color={MARKER_COLORS.destination}
+              placeholder="Destination address"
+              endpoint={destination}
+              onSelect={onDestinationSelect}
+            />
+          </section>
+
+          <section className="control-section">
+            <label className="control-label" htmlFor="safety-slider">
+              Route priority
+            </label>
+            <input
+              id="safety-slider"
+              className="safety-slider"
+              type="range"
+              min="0"
+              max="100"
+              value={slider}
+              onChange={(e) => setSlider(Number(e.target.value))}
+            />
+            <div className="slider-ends">
+              <span>Fastest</span>
+              <span>Safest</span>
+            </div>
+          </section>
+        </>
+      )}
 
       <section className="control-section">
         <span className="control-label">Time of day</span>
@@ -83,6 +93,10 @@ export default function ControlPanel({
           ))}
         </div>
       </section>
+
+      {mode === 'explore' && (
+        <p className="explore-hint">Tap anywhere on the map to check that area’s safety.</p>
+      )}
     </div>
   )
 }

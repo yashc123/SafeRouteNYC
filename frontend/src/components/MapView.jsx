@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-import { MAP_STYLE, MANHATTAN_CENTER, INITIAL_ZOOM } from '../config'
+import { MAP_STYLE, MANHATTAN_CENTER, INITIAL_ZOOM, MARKER_COLORS } from '../config'
 import {
   ensureRouteLayers,
   setRouteData,
@@ -14,6 +14,9 @@ import {
   setSegmentHighlight,
   SEGMENT_HIT_LAYER,
 } from '../lib/mapRoutes'
+import { ensureExploreLayers, setExploreArea, clearExploreArea } from '../lib/mapExplore'
+
+const EXPLORE_MARKER_COLOR = '#94a3b8' // neutral slate — not alarmist
 
 // queryRenderedFeatures returns properties as strings/values; normalize types.
 function normalizeSegment(props) {
@@ -25,25 +28,39 @@ function normalizeSegment(props) {
   }
 }
 
-// Owns the MapLibre map instance and mirrors React state onto it imperatively:
-// markers, the two route lines, and the clickable safe-route segments. All map
-// mutation lives here; the rest of the app just passes props.
-export default function MapView({ origin, destination, routes, onMapClick, onSegmentClick }) {
+// Owns the MapLibre map. Route mode: markers + route lines + clickable segments.
+// Explore mode: a neutral marker + a soft shaded footprint. All map mutation lives
+// here; the rest of the app passes props and the current `mode`.
+export default function MapView({
+  mode,
+  origin,
+  destination,
+  routes,
+  explorePoint,
+  exploreArea,
+  onMapClick,
+  onSegmentClick,
+  onExploreClick,
+}) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const readyRef = useRef(false)
   const originMarkerRef = useRef(null)
   const destMarkerRef = useRef(null)
+  const exploreMarkerRef = useRef(null)
   const lastFitKeyRef = useRef(null)
 
-  // Keep the latest handlers in refs so the once-registered map listeners always
-  // call the current versions (which close over current state).
+  // Latest handlers + mode kept in refs so the once-registered listeners use them.
   const clickHandlerRef = useRef(onMapClick)
   const segmentClickRef = useRef(onSegmentClick)
+  const exploreClickRef = useRef(onExploreClick)
+  const modeRef = useRef(mode)
   useEffect(() => {
     clickHandlerRef.current = onMapClick
     segmentClickRef.current = onSegmentClick
-  }, [onMapClick, onSegmentClick])
+    exploreClickRef.current = onExploreClick
+    modeRef.current = mode
+  }, [onMapClick, onSegmentClick, onExploreClick, mode])
 
   // Initialize the map once.
   useEffect(() => {
@@ -58,10 +75,12 @@ export default function MapView({ origin, destination, routes, onMapClick, onSeg
     map.on('load', () => {
       ensureRouteLayers(map)
       ensureSegmentLayers(map)
+      ensureExploreLayers(map)
       readyRef.current = true
     })
 
-    // Hover over a safe-route segment: pointer cursor + highlight that segment.
+    // Hover over a safe-route segment (route mode only — in explore the segment
+    // source is empty so nothing fires): pointer cursor + highlight.
     map.on('mousemove', SEGMENT_HIT_LAYER, (e) => {
       map.getCanvas().style.cursor = 'pointer'
       if (e.features?.[0]) setSegmentHighlight(map, e.features[0].geometry)
@@ -71,10 +90,14 @@ export default function MapView({ origin, destination, routes, onMapClick, onSeg
       setSegmentHighlight(map, null)
     })
 
-    // Unified click: if the click hit a segment, open its detail (and DON'T treat
-    // it as a routing click, so it won't set a point / reset). Otherwise it's a
-    // normal map click. queryRenderedFeatures tells us which case we're in.
+    // Unified click, branching on mode:
+    //  - Explore: report the tapped point for an area lookup.
+    //  - Route: if a segment was hit, open its detail; else it's a routing click.
     map.on('click', (e) => {
+      if (modeRef.current === 'explore') {
+        exploreClickRef.current?.(e.lngLat)
+        return
+      }
       const hits = map.queryRenderedFeatures(e.point, { layers: [SEGMENT_HIT_LAYER] })
       if (hits.length > 0) {
         segmentClickRef.current?.(normalizeSegment(hits[0].properties))
@@ -94,44 +117,56 @@ export default function MapView({ origin, destination, routes, onMapClick, onSeg
     }
   }, [])
 
-  // Origin marker (green).
+  // Origin marker (green) — route mode only.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    if (origin) {
+    if (mode === 'route' && origin) {
       if (!originMarkerRef.current) {
-        originMarkerRef.current = new maplibregl.Marker({ color: '#22c55e' })
+        originMarkerRef.current = new maplibregl.Marker({ color: MARKER_COLORS.origin })
       }
       originMarkerRef.current.setLngLat([origin.lng, origin.lat]).addTo(map)
     } else if (originMarkerRef.current) {
       originMarkerRef.current.remove()
       originMarkerRef.current = null
     }
-  }, [origin])
+  }, [origin, mode])
 
-  // Destination marker (red).
+  // Destination marker (red) — route mode only.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    if (destination) {
+    if (mode === 'route' && destination) {
       if (!destMarkerRef.current) {
-        destMarkerRef.current = new maplibregl.Marker({ color: '#ef4444' })
+        destMarkerRef.current = new maplibregl.Marker({ color: MARKER_COLORS.destination })
       }
       destMarkerRef.current.setLngLat([destination.lng, destination.lat]).addTo(map)
     } else if (destMarkerRef.current) {
       destMarkerRef.current.remove()
       destMarkerRef.current = null
     }
-  }, [destination])
+  }, [destination, mode])
 
-  // Routes: draw both; clear when routes go away. Only fit the view when the
-  // endpoint PAIR changes (a new route request) — not on slider/time re-routes,
-  // which would make the map jump while the user is tuning. We key the fit off
-  // the route's snapped endpoints.
+  // Explore marker (neutral) — explore mode only.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (mode === 'explore' && explorePoint) {
+      if (!exploreMarkerRef.current) {
+        exploreMarkerRef.current = new maplibregl.Marker({ color: EXPLORE_MARKER_COLOR })
+      }
+      exploreMarkerRef.current.setLngLat([explorePoint.lng, explorePoint.lat]).addTo(map)
+    } else if (exploreMarkerRef.current) {
+      exploreMarkerRef.current.remove()
+      exploreMarkerRef.current = null
+    }
+  }, [explorePoint, mode])
+
+  // Route lines — route mode only. Fit only when the endpoint pair changes.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
-    if (routes?.fast?.geometry && routes?.safe?.geometry) {
+    if (mode === 'route' && routes?.fast?.geometry && routes?.safe?.geometry) {
       setRouteData(map, routes.fast.geometry, routes.safe.geometry)
       const so = routes.safe.snapped_origin
       const sd = routes.safe.snapped_destination
@@ -144,15 +179,14 @@ export default function MapView({ origin, destination, routes, onMapClick, onSeg
       clearRouteData(map)
       lastFitKeyRef.current = null
     }
-  }, [routes])
+  }, [routes, mode])
 
-  // Clickable safe-route segments (with embedded scores). Rebuilt on every route
-  // change; clearing also drops any lingering highlight.
+  // Clickable safe-route segments — route mode only.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
     setSegmentHighlight(map, null)
-    const segs = routes?.safe?.segments
+    const segs = mode === 'route' ? routes?.safe?.segments : null
     if (segs?.length) {
       const features = segs.map((s) => ({
         type: 'Feature',
@@ -168,7 +202,18 @@ export default function MapView({ origin, destination, routes, onMapClick, onSeg
     } else {
       clearSegments(map)
     }
-  }, [routes])
+  }, [routes, mode])
+
+  // Explore footprint shading — explore mode only.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !readyRef.current) return
+    if (mode === 'explore' && exploreArea?.snapped && exploreArea?.radius_m) {
+      setExploreArea(map, exploreArea.snapped.lng, exploreArea.snapped.lat, exploreArea.radius_m)
+    } else {
+      clearExploreArea(map)
+    }
+  }, [exploreArea, mode])
 
   return <div ref={containerRef} className="map" />
 }

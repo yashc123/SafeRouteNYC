@@ -60,6 +60,10 @@ VALID_TIMES = ("day", "evening", "night")
 # Default walk-time budget in minutes for the reachable-area query.
 DEFAULT_BUDGET_MIN = 15.0
 
+# Explore mode: how many graph hops around the tapped point define its "area".
+# 2 hops ≈ the tapped block plus the immediately adjacent blocks.
+AREA_KRING = 2
+
 # Concave-hull tightness for turning reached nodes into a region. shapely's ratio
 # is in [0, 1]: 1 == convex hull (simple but overstates reach, bridging across
 # unreachable pockets); lower == more concave, hugging the true reachable extent.
@@ -255,6 +259,61 @@ class Router:
         return {
             "fast": self.route(origin, dest, 0.0, time_of_day),
             "safe": self.route(origin, dest, safe_alpha, time_of_day),
+        }
+
+    # -- area safety (Explore mode) ------------------------------------------
+    def area_safety(self, lat, lng, time_of_day):
+        """Safety profile of the AREA around a tapped point.
+
+        Snaps to the nearest node, takes its k-hop neighborhood (the tapped block
+        plus adjacent blocks), and length-weighted-averages the same precomputed
+        per-segment scores routing uses. Returns an overall 0-100 area score, the
+        component scores, and a footprint radius (meters) for the frontend to shade.
+        Aggregated scores only — never individual incidents.
+        """
+        node = self.snap(lat, lng)
+        pen_key = f"pen_{time_of_day}"
+        iden_key = f"iden_{time_of_day}"
+
+        ring = nx.ego_graph(self.G, node, radius=AREA_KRING, undirected=True)
+        edges = list(ring.edges(data=True))
+        if not edges:  # isolated snap — fall back to the node's own incident edges
+            edges = list(self.G.out_edges(node, data=True)) + list(self.G.in_edges(node, data=True))
+
+        total_len = weighted_pen = weighted_iden = weighted_light = lit_len = 0.0
+        for _a, _b, data in edges:
+            length = data["length"]
+            total_len += length
+            weighted_pen += length * data[pen_key]
+            weighted_iden += length * data[iden_key]
+            weighted_light += length * data["lighting_score"]
+            if data["has_lighting_data"]:
+                lit_len += length
+
+        denom = total_len if total_len > 0 else 1.0
+        avg_pen = weighted_pen / denom
+        area_score = 100.0 * (1.0 - min(avg_pen / SAFETY_SCORE_PENALTY_REF, 1.0))
+
+        # Footprint radius = farthest ring node from the snapped center (min 60 m
+        # so a tap always shades a visible area).
+        clng, clat = self.coords[node]
+        radius_m = 60.0
+        for n in ring.nodes:
+            nlng, nlat = self.coords[n]
+            radius_m = max(radius_m, _haversine_m(clat, clng, nlat, nlng))
+
+        return {
+            "snapped": {"lat": clat, "lng": clng},
+            "radius_m": round(radius_m, 1),
+            "time_of_day": time_of_day,
+            "area_safety_score": round(area_score, 1),
+            "segment_count": len(edges),
+            "components": {
+                "incident_density": round(weighted_iden / denom, 4),
+                "lighting_score": round(weighted_light / denom, 4),
+                "lighting_coverage": round(lit_len / denom, 4),
+                "time_of_day": time_of_day,
+            },
         }
 
     # -- reachability (Dijkstra outward from origin) -------------------------

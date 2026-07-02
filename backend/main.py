@@ -279,3 +279,19 @@ def reachable(
 
 def _ms(t0):
     return round((perf_counter() - t0) * 1000, 2)
+
+
+@app.get("/area-safety")
+def area_safety(
+    lat: float = Query(ge=-90, le=90),
+    lng: float = Query(ge=-180, le=180),
+    time_of_day: str = "night",
+):
+    """Explore mode: safety profile of the area around a tapped point. Snaps to the
+    nearest segment, aggregates its k-hop neighborhood's precomputed scores, and
+    returns an overall 0-100 area score plus component scores + footprint radius.
+    Aggregated scores only — no individual incidents.
+    """
+    _require_ready()
+    tod = _validate_time(time_of_day)
+    return router.area_safety(lat, lng, tod)

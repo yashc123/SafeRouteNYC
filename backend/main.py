@@ -1,20 +1,32 @@
 """SafePath backend — FastAPI application entrypoint.
 
 Endpoints: /health, /graph/stats (Phase 1), /segment/{id}/safety (Phase 3),
-and POST /route (Phase 4). The weighted routing graph is loaded into memory once
-at startup (see lifespan below) so route searches never hit the database.
+POST /route (Phase 4), GET /reachable (Phase 5). Phase 6 adds the tier-3 Redis
+cache (see cache.py) and per-request timing.
+
+Three-tier caching:
+  Tier 1: per-segment safety weights precomputed in PostGIS (edge_safety).
+  Tier 2: the weighted graph held in memory (routing.py) — loaded once below.
+  Tier 3: Redis cache of full route/reachable results (cache.py).
 """
 
+import os
 from contextlib import asynccontextmanager
+from time import perf_counter
 
 import networkx as nx
 import psycopg2
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from cache import cache, reachable_key, route_key
 from database import get_connection
 from routing import DEFAULT_BUDGET_MIN, DEFAULT_SAFE_ALPHA, VALID_TIMES, router
+
+# Validation bounds (named + tunable). Kept generous; snapping handles off-graph points.
+ALPHA_MAX = 100.0
+BUDGET_MIN_MAX = 120.0
 
 
 @asynccontextmanager
@@ -28,19 +40,21 @@ async def lifespan(app: FastAPI):
     except psycopg2.errors.UndefinedTable:
         print("Routing graph NOT loaded (road_edges/edge_safety missing). "
               "Run Phases 1-3, then restart.")
+    print(f"Redis cache reachable: {cache.ping()}")
     yield
 
 
 app = FastAPI(title="SafePath API", version="0.0.0", lifespan=lifespan)
 
-# Allow the local Vite dev server (and common localhost variants) to call the API.
-# Tighten / parameterize this for production deployment later.
+# CORS origins come from env (comma-separated), defaulting to the Vite dev server.
+_cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -173,70 +187,95 @@ def segment_safety(edge_id: int):
 
 
 class Coord(BaseModel):
-    lat: float
-    lng: float
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
 
 
 class RouteRequest(BaseModel):
     origin: Coord
     destination: Coord
     # alpha applies to the "safe" route; the "fast" route is always alpha=0.
-    alpha: float = DEFAULT_SAFE_ALPHA
+    alpha: float = Field(default=DEFAULT_SAFE_ALPHA, ge=0, le=ALPHA_MAX)
     time_of_day: str = "night"
+
+
+def _require_ready():
+    if not router.ready:
+        raise HTTPException(
+            status_code=503,
+            detail="Routing graph not loaded. Ensure Phases 1-3 have run, then restart the API.",
+        )
+
+
+def _validate_time(time_of_day):
+    tod = time_of_day.lower()
+    if tod not in VALID_TIMES:
+        raise HTTPException(status_code=422, detail=f"time_of_day must be one of {list(VALID_TIMES)}.")
+    return tod
 
 
 @app.post("/route")
 def route(req: RouteRequest):
     """Compute BOTH a fast route (alpha=0, shortest) and a safe route
     (alpha=req.alpha, safety-weighted) between two lat/lng points, for the given
-    time_of_day. Each route returns GeoJSON geometry, distance, walk time, and a
-    0-100 safety score.
+    time_of_day. Returns GeoJSON geometry, distance, walk time, and a 0-100 safety
+    score per route. Results are cached in Redis (tier 3), keyed on the snapped
+    node ids so nearby coordinates reuse one entry.
     """
-    if not router.ready:
-        raise HTTPException(
-            status_code=503,
-            detail="Routing graph not loaded. Ensure Phases 1-3 have run, then restart the API.",
-        )
-    tod = req.time_of_day.lower()
-    if tod not in VALID_TIMES:
-        raise HTTPException(status_code=422, detail=f"time_of_day must be one of {list(VALID_TIMES)}.")
-    if req.alpha < 0:
-        raise HTTPException(status_code=422, detail="alpha must be >= 0.")
+    _require_ready()
+    tod = _validate_time(req.time_of_day)
+    t0 = perf_counter()
 
     origin = (req.origin.lat, req.origin.lng)
     destination = (req.destination.lat, req.destination.lng)
+
+    # Key on snapped nodes: many nearby clicks/GPS points map to the same nodes.
+    src = router.snap(*origin)
+    dst = router.snap(*destination)
+    key = route_key(src, dst, req.alpha, tod)
+
+    cached = cache.get(key)
+    if cached is not None:
+        return {**cached, "cache": {"status": "hit", "server_ms": _ms(t0)}}
+
     try:
         routes = router.route_pair(origin, destination, req.alpha, tod)
     except nx.NetworkXNoPath:
         raise HTTPException(status_code=422, detail="No walking path between origin and destination.")
 
-    return {"time_of_day": tod, "safe_alpha": req.alpha, **routes}
+    payload = {"time_of_day": tod, "safe_alpha": req.alpha, **routes}
+    cache.set(key, payload)
+    return {**payload, "cache": {"status": "miss", "server_ms": _ms(t0)}}
 
 
 @app.get("/reachable")
 def reachable(
-    lat: float,
-    lng: float,
+    lat: float = Query(ge=-90, le=90),
+    lng: float = Query(ge=-180, le=180),
     time_of_day: str = "night",
-    alpha: float = DEFAULT_SAFE_ALPHA,
-    budget_min: float = DEFAULT_BUDGET_MIN,
+    alpha: float = Query(default=DEFAULT_SAFE_ALPHA, ge=0, le=ALPHA_MAX),
+    budget_min: float = Query(default=DEFAULT_BUDGET_MIN, gt=0, le=BUDGET_MIN_MAX),
 ):
     """Reachable-area (isochrone-like) polygon: everywhere reachable on foot from
     (lat, lng) within a `budget_min` walk-time budget under the safety-weighted
-    cost model. Returns a GeoJSON polygon plus the reachable-node count. Raising
-    alpha or using a riskier time_of_day contracts the area.
+    cost model. Returns a GeoJSON polygon plus reachable-node count. Raising alpha
+    or using a riskier time_of_day contracts the area. Cached in Redis (tier 3).
     """
-    if not router.ready:
-        raise HTTPException(
-            status_code=503,
-            detail="Routing graph not loaded. Ensure Phases 1-3 have run, then restart the API.",
-        )
-    tod = time_of_day.lower()
-    if tod not in VALID_TIMES:
-        raise HTTPException(status_code=422, detail=f"time_of_day must be one of {list(VALID_TIMES)}.")
-    if alpha < 0:
-        raise HTTPException(status_code=422, detail="alpha must be >= 0.")
-    if budget_min <= 0:
-        raise HTTPException(status_code=422, detail="budget_min must be > 0.")
+    _require_ready()
+    tod = _validate_time(time_of_day)
+    t0 = perf_counter()
 
-    return router.reachable_area((lat, lng), alpha, tod, budget_min)
+    src = router.snap(lat, lng)
+    key = reachable_key(src, alpha, tod, budget_min)
+
+    cached = cache.get(key)
+    if cached is not None:
+        return {**cached, "cache": {"status": "hit", "server_ms": _ms(t0)}}
+
+    result = router.reachable_area((lat, lng), alpha, tod, budget_min)
+    cache.set(key, result)
+    return {**result, "cache": {"status": "miss", "server_ms": _ms(t0)}}
+
+
+def _ms(t0):
+    return round((perf_counter() - t0) * 1000, 2)

@@ -1,5 +1,4 @@
-# SafePath local infrastructure.
-# Phase 0: just the PostGIS database. Backend/Redis get containerized in later phases.
+# SafePath local infrastructure: PostGIS database + Redis cache.
 
 services:
   db:
@@ -31,6 +30,22 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d safepath"]
       interval: 5s
       timeout: 5s
+      retries: 5
+
+  redis:
+    # Tier-3 cache for repeat /route and /reachable results. Pinned (NOT "latest").
+    # No named volume: this is a disposable cache — losing it just forces recompute.
+    image: redis:7.4-alpine
+    container_name: safepath-redis
+    restart: unless-stopped
+    ports:
+      # Publish the standard Redis port so the backend on the host connects via
+      # REDIS_URL (redis://localhost:6379/0).
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 5
 
 volumes:

@@ -1,17 +1,37 @@
 """SafePath backend — FastAPI application entrypoint.
 
-Phase 0: a single health-check endpoint plus CORS so the Vite frontend
-(running on localhost) can call this API during development. Routing,
-data, and city endpoints arrive in later phases.
+Endpoints: /health, /graph/stats (Phase 1), /segment/{id}/safety (Phase 3),
+and POST /route (Phase 4). The weighted routing graph is loaded into memory once
+at startup (see lifespan below) so route searches never hit the database.
 """
 
+from contextlib import asynccontextmanager
+
+import networkx as nx
 import psycopg2
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from database import get_connection
+from routing import DEFAULT_SAFE_ALPHA, VALID_TIMES, router
 
-app = FastAPI(title="SafePath API", version="0.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load the in-memory weighted graph once at startup. If the tables aren't
+    populated yet, log and continue — /route will report 503 until they are."""
+    try:
+        router.load()
+        print(f"Routing graph loaded: {router.G.number_of_nodes():,} nodes, "
+              f"{router.G.number_of_edges():,} edges.")
+    except psycopg2.errors.UndefinedTable:
+        print("Routing graph NOT loaded (road_edges/edge_safety missing). "
+              "Run Phases 1-3, then restart.")
+    yield
+
+
+app = FastAPI(title="SafePath API", version="0.0.0", lifespan=lifespan)
 
 # Allow the local Vite dev server (and common localhost variants) to call the API.
 # Tighten / parameterize this for production deployment later.
@@ -150,3 +170,44 @@ def segment_safety(edge_id: int):
             "overall": r(sw_overall),
         },
     }
+
+
+class Coord(BaseModel):
+    lat: float
+    lng: float
+
+
+class RouteRequest(BaseModel):
+    origin: Coord
+    destination: Coord
+    # alpha applies to the "safe" route; the "fast" route is always alpha=0.
+    alpha: float = DEFAULT_SAFE_ALPHA
+    time_of_day: str = "night"
+
+
+@app.post("/route")
+def route(req: RouteRequest):
+    """Compute BOTH a fast route (alpha=0, shortest) and a safe route
+    (alpha=req.alpha, safety-weighted) between two lat/lng points, for the given
+    time_of_day. Each route returns GeoJSON geometry, distance, walk time, and a
+    0-100 safety score.
+    """
+    if not router.ready:
+        raise HTTPException(
+            status_code=503,
+            detail="Routing graph not loaded. Ensure Phases 1-3 have run, then restart the API.",
+        )
+    tod = req.time_of_day.lower()
+    if tod not in VALID_TIMES:
+        raise HTTPException(status_code=422, detail=f"time_of_day must be one of {list(VALID_TIMES)}.")
+    if req.alpha < 0:
+        raise HTTPException(status_code=422, detail="alpha must be >= 0.")
+
+    origin = (req.origin.lat, req.origin.lng)
+    destination = (req.destination.lat, req.destination.lng)
+    try:
+        routes = router.route_pair(origin, destination, req.alpha, tod)
+    except nx.NetworkXNoPath:
+        raise HTTPException(status_code=422, detail="No walking path between origin and destination.")
+
+    return {"time_of_day": tod, "safe_alpha": req.alpha, **routes}

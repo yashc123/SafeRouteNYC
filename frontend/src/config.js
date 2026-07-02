@@ -10,9 +10,14 @@ export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 // Dark basemap style (from Phase 0).
 export const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
 
-// Manhattan view defaults. [lng, lat] order for MapLibre.
-export const MANHATTAN_CENTER = [-73.97, 40.78]
-export const INITIAL_ZOOM = 12
+// Default view: framed on the whole island so ALL of Manhattan (Inwood in the
+// north down to the Battery in the south) is visible on load, with a little
+// margin. Center is the island's N-S midpoint; z10.5 fits ~20 km end-to-end in a
+// typical window. Starting zoomed-out like this also means fitBounds only has to
+// zoom IN (never make a big zoom-out) to frame a long route, which is what keeps
+// full-island route framing smooth. [lng, lat] order for MapLibre.
+export const MANHATTAN_CENTER = [-73.965, 40.79]
+export const INITIAL_ZOOM = 10.5
 
 // Keep the map on Manhattan. maxBounds ([SW, NE]) is a Manhattan bbox with ~2-3 km
 // of breathing room on each side so the island's edges aren't cut off; minZoom

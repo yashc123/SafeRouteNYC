@@ -82,15 +82,27 @@ body {
   display: inline-block;
 }
 
-/* Control panel, top-left. Interactive, so (unlike the overlays above) it DOES
-   capture pointer events. Structured as stacked sections for future controls. */
-.control-panel {
+/* Left column: control panel + route breakdown, stacked. Interactive (captures
+   pointer events, unlike the info-only overlays). */
+.left-stack {
   position: absolute;
   top: 14px;
   left: 14px;
   z-index: 2;
   width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+}
+
+/* Shared dark-card look for the left-stack cards + the segment detail panel. */
+.control-panel,
+.breakdown-card,
+.segment-detail {
   padding: 14px;
+  box-sizing: border-box;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: #e8eaed;
   background: rgba(20, 22, 28, 0.9);
@@ -98,6 +110,11 @@ body {
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(6px);
+}
+
+.control-panel,
+.breakdown-card {
+  width: 100%;
 }
 
 .control-section + .control-section {
@@ -271,4 +288,117 @@ body {
     flex-direction: column;
     gap: 8px;
   }
+}
+
+/* --- Safety breakdown (sub-step 4) --- */
+.panel-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #9aa0a6;
+}
+
+.breakdown-card .panel-title {
+  display: block;
+  margin-bottom: 11px;
+}
+
+/* Segment detail panel, top-right (opposite the controls). */
+.segment-detail {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 218px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  color: #9aa0a6;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.panel-close:hover {
+  color: #e8eaed;
+}
+
+/* Labeled bars. */
+.bar-row + .bar-row {
+  margin-top: 11px;
+}
+
+.bar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+  font-size: 11.5px;
+}
+
+.bar-label {
+  color: #c8ccd0;
+}
+
+.bar-value {
+  color: #9aa0a6;
+  text-transform: capitalize;
+}
+
+.bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* Honest data notes. */
+.coverage-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #9aa0a6;
+}
+
+.fallback-note {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #e0a458; /* muted amber caution — never red */
+}
+
+.time-factor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tf-label {
+  font-size: 11px;
+  color: #9aa0a6;
+}
+
+.tf-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  color: #7fe7d8;
+  background: rgba(45, 212, 191, 0.15);
+  border: 1px solid rgba(45, 212, 191, 0.3);
 }

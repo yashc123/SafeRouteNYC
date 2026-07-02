@@ -98,9 +98,11 @@ class Router:
                 node_rows = cur.fetchall()
                 cur.execute(
                     """
-                    SELECT e.u, e.v, e.length_m,
-                           s.safety_weight_day, s.safety_weight_evening,
-                           s.safety_weight_night, ST_AsGeoJSON(e.geom)
+                    SELECT e.id, e.u, e.v, e.length_m,
+                           s.safety_weight_day, s.safety_weight_evening, s.safety_weight_night,
+                           s.incident_density_day, s.incident_density_evening,
+                           s.incident_density_night, s.lighting_score, s.has_lighting_data,
+                           ST_AsGeoJSON(e.geom)
                     FROM road_edges e
                     JOIN edge_safety s ON s.edge_id = e.id;
                     """
@@ -113,17 +115,25 @@ class Router:
             coords[osmid] = (x, y)
             graph.add_node(osmid, x=x, y=y)
 
-        for u, v, length, sw_day, sw_eve, sw_night, geojson in edge_rows:
+        for (edge_id, u, v, length, sw_day, sw_eve, sw_night, iden_day, iden_eve,
+             iden_night, lighting_score, has_lighting, geojson) in edge_rows:
             # Collapse rare parallel edges to the shorter one.
             if graph.has_edge(u, v) and graph[u][v]["length"] <= length:
                 continue
             line = json.loads(geojson)["coordinates"]  # [[lon, lat], ...]
             graph.add_edge(
                 u, v,
+                edge_id=edge_id,
                 length=length,
                 pen_day=max(0.0, sw_day - SAFETY_SHIFT),
                 pen_evening=max(0.0, sw_eve - SAFETY_SHIFT),
                 pen_night=max(0.0, sw_night - SAFETY_SHIFT),
+                # Component scores (for the safety breakdown + per-segment detail).
+                iden_day=iden_day,
+                iden_evening=iden_eve,
+                iden_night=iden_night,
+                lighting_score=lighting_score,
+                has_lighting_data=has_lighting,
                 coords=line,
             )
 
@@ -174,25 +184,48 @@ class Router:
         src = self.snap(*origin)
         dst = self.snap(*dest)
         pen_key = f"pen_{time_of_day}"
+        iden_key = f"iden_{time_of_day}"  # time-of-day incident density
         weight = self._edge_cost_fn(alpha, time_of_day)
 
         path = nx.astar_path(self.G, src, dst, heuristic=self._heuristic, weight=weight)
 
         total_len = 0.0
         weighted_pen = 0.0
+        weighted_iden = 0.0     # for the route-level incident-density aggregate
+        weighted_light = 0.0    # for the route-level lighting aggregate
+        lit_len = 0.0           # route length that has real lighting data (not fallback)
         geometry = []
+        segments = []
         for a, b in zip(path[:-1], path[1:]):
             data = self.G[a][b]
-            total_len += data["length"]
-            weighted_pen += data["length"] * data[pen_key]
+            length = data["length"]
+            total_len += length
+            weighted_pen += length * data[pen_key]
+            weighted_iden += length * data[iden_key]
+            weighted_light += length * data["lighting_score"]
+            if data["has_lighting_data"]:
+                lit_len += length
+
             seg = data["coords"]
             if geometry and seg and geometry[-1] == seg[0]:
                 geometry.extend(seg[1:])  # avoid duplicating the shared junction
             else:
                 geometry.extend(seg)
 
-        # Length-weighted average penalty -> 0-100 safety score (higher = safer).
-        avg_pen = (weighted_pen / total_len) if total_len > 0 else 0.0
+            # Per-segment record with EMBEDDED scores so the frontend needs no extra
+            # request to show a clicked segment's breakdown. incident_density is the
+            # time-of-day density matching this route's time_of_day.
+            segments.append({
+                "edge_id": data["edge_id"],
+                "incident_density": round(data[iden_key], 4),
+                "lighting_score": round(data["lighting_score"], 4),
+                "has_lighting_data": bool(data["has_lighting_data"]),
+                "geometry": {"type": "LineString", "coordinates": seg},
+            })
+
+        # Length-weighted aggregates (safe against a zero-length degenerate route).
+        denom = total_len if total_len > 0 else 1.0
+        avg_pen = weighted_pen / denom
         safety_score = 100.0 * (1.0 - min(avg_pen / SAFETY_SCORE_PENALTY_REF, 1.0))
         duration_min = (total_len / WALKING_SPEED_MPS) / 60.0
 
@@ -203,6 +236,14 @@ class Router:
             "safety_score": round(safety_score, 1),
             "avg_penalty": round(avg_pen, 4),
             "num_segments": len(path) - 1,
+            # Route-level component aggregates driving the safety score.
+            "components": {
+                "incident_density": round(weighted_iden / denom, 4),
+                "lighting_score": round(weighted_light / denom, 4),
+                "lighting_coverage": round(lit_len / denom, 4),
+                "time_of_day": time_of_day,
+            },
+            "segments": segments,
             "snapped_origin": {"lat": self.coords[src][1], "lng": self.coords[src][0]},
             "snapped_destination": {"lat": self.coords[dst][1], "lng": self.coords[dst][0]},
             "geometry": {"type": "LineString", "coordinates": geometry},

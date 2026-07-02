@@ -63,3 +63,51 @@ export function fitToRoutes(map, geometries) {
     map.fitBounds(bounds, { padding: 80, duration: 700 })
   }
 }
+
+// --- Per-segment interaction layers (sub-step 4) ---------------------------
+// The safe route's segments are drawn as individual clickable features. A wide,
+// fully-transparent "hit" line sits on top for easy hover/click targeting; a
+// separate highlight source shows the hovered segment. We keep the visible route
+// lines above unchanged — this only adds interaction + a highlight.
+const SEGMENTS = { source: 'safe-segments', hit: 'safe-segments-hit' }
+const HIGHLIGHT = { source: 'segment-highlight', layer: 'segment-highlight-line' }
+
+// Exported so the map's click handler can query which segment was clicked.
+export const SEGMENT_HIT_LAYER = SEGMENTS.hit
+
+export function ensureSegmentLayers(map) {
+  if (!map.getSource(HIGHLIGHT.source)) {
+    map.addSource(HIGHLIGHT.source, { type: 'geojson', data: EMPTY })
+    map.addLayer({
+      id: HIGHLIGHT.layer,
+      type: 'line',
+      source: HIGHLIGHT.source,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': 4, 'line-opacity': 0.9 },
+    })
+  }
+  if (!map.getSource(SEGMENTS.source)) {
+    map.addSource(SEGMENTS.source, { type: 'geojson', data: EMPTY })
+    map.addLayer({
+      id: SEGMENTS.hit,
+      type: 'line',
+      source: SEGMENTS.source,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      // Invisible but interactive: a fat transparent line = generous click target.
+      paint: { 'line-color': '#000000', 'line-width': 16, 'line-opacity': 0 },
+    })
+  }
+}
+
+export function setSegments(map, features) {
+  map.getSource(SEGMENTS.source)?.setData({ type: 'FeatureCollection', features })
+}
+
+export function clearSegments(map) {
+  map.getSource(SEGMENTS.source)?.setData(EMPTY)
+  map.getSource(HIGHLIGHT.source)?.setData(EMPTY)
+}
+
+export function setSegmentHighlight(map, geometry) {
+  map.getSource(HIGHLIGHT.source)?.setData(geometry ? lineFeature(geometry) : EMPTY)
+}

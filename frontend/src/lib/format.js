@@ -18,3 +18,15 @@ export function formatSafety(score) {
   if (score == null) return '—'
   return Math.round(score)
 }
+
+// Qualitative label for a 0-1 score, for the calm labeled bars.
+export function qualitative(value) {
+  if (value == null) return '—'
+  if (value >= 0.66) return 'high'
+  if (value >= 0.33) return 'moderate'
+  return 'low'
+}
+
+export function capitalize(text) {
+  return text ? text[0].toUpperCase() + text.slice(1) : text
+}

@@ -1,13 +1,16 @@
+import { useEffect, useState } from 'react'
 import MapView from './components/MapView'
 import Legend from './components/Legend'
 import StatusPill from './components/StatusPill'
 import ControlPanel from './components/ControlPanel'
 import RouteCards from './components/RouteCards'
+import RouteBreakdown from './components/RouteBreakdown'
+import SegmentDetail from './components/SegmentDetail'
 import { useRouting } from './hooks/useRouting'
 
-// Sub-step 2: adds the safety-vs-speed slider + time-of-day selector. Routing
-// state (incl. alpha / time_of_day) lives in useRouting; ControlPanel drives the
-// setters; MapView still just reacts to `routes`.
+// Sub-step 4: adds the safety breakdown. Left stack = controls + route-level
+// "why this route" breakdown. Clicking a safe-route segment opens a per-segment
+// detail panel (top-right). Segment selection clears whenever the routes change.
 export default function App() {
   const {
     origin,
@@ -22,6 +25,13 @@ export default function App() {
     setTimeOfDay,
   } = useRouting()
 
+  const [selectedSegment, setSelectedSegment] = useState(null)
+
+  // Any re-route or reset invalidates a previously selected segment.
+  useEffect(() => {
+    setSelectedSegment(null)
+  }, [routes])
+
   return (
     <>
       <MapView
@@ -29,12 +39,23 @@ export default function App() {
         destination={destination}
         routes={routes}
         onMapClick={handleMapClick}
+        onSegmentClick={setSelectedSegment}
       />
-      <ControlPanel
-        alpha={alpha}
+
+      <div className="left-stack">
+        <ControlPanel
+          alpha={alpha}
+          timeOfDay={timeOfDay}
+          onAlphaChange={setAlpha}
+          onTimeChange={setTimeOfDay}
+        />
+        {routes && <RouteBreakdown safe={routes.safe} />}
+      </div>
+
+      <SegmentDetail
+        segment={selectedSegment}
         timeOfDay={timeOfDay}
-        onAlphaChange={setAlpha}
-        onTimeChange={setTimeOfDay}
+        onClose={() => setSelectedSegment(null)}
       />
       <RouteCards routes={routes} />
       <StatusPill origin={origin} destination={destination} loading={loading} error={error} />

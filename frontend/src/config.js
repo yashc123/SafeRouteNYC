@@ -20,6 +20,13 @@ export const ROUTE_COLORS = {
   safe: '#2dd4bf',
 }
 
+// Safety-breakdown bar colors. Calm, non-alarmist: teal for lighting (good),
+// muted amber for incidents (caution). Never red.
+export const COMPONENT_COLORS = {
+  lighting: '#2dd4bf',
+  incidents: '#e0a458',
+}
+
 // Safety-vs-speed slider -> alpha mapping.
 // The slider is 0..100; alpha is 0..ALPHA_MAX. Max 10 because testing showed
 // alpha 3-8 gives the useful safe detours; 10 makes the "Safest" end decisive

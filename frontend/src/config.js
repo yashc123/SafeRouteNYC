@@ -19,17 +19,20 @@ export const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2-dark/style.js
 export const MANHATTAN_CENTER = [-73.965, 40.79]
 export const INITIAL_ZOOM = 10.5
 
-// Keep the map on Manhattan. maxBounds ([SW, NE]) is a Manhattan bbox with ~2-3 km
-// of breathing room on each side so the island's edges aren't cut off; minZoom
-// stops the user zooming out until Manhattan is lost in the wider region.
+// Manhattan is long and narrow, so any full-island view unavoidably includes some
+// NJ/Brooklyn/Queens. Rather than fight that with tight view limits (which clamp and
+// glitch), we keep the view LOOSE and enforce Manhattan coverage at the CLICK instead
+// (the /coverage check + "currently covers Manhattan" toast). maxBounds ([SW, NE]) is
+// just a generous NYC-metro box so the user can't wander off into empty tiles far from
+// the city; Manhattan sits well inside it, so it never clamps while viewing the island
+// or framing a route.
 export const MAP_MAX_BOUNDS = [
-  [-74.05, 40.68],
-  [-73.88, 40.89],
+  [-74.3, 40.45],
+  [-73.55, 41.02],
 ]
-// z10 fits Manhattan end-to-end (~21 km N-S) in one frame WITH room for fitBounds
-// padding on a long cross-island route, while the island still fills ~half the view
-// (z9 would show the whole metro and lose the focus). maxBounds keeps panning tight.
-export const MAP_MIN_ZOOM = 10
+// Loose enough that the whole-island view and any route framing never clamp; it only
+// gently stops a deliberate zoom-out to the whole region.
+export const MAP_MIN_ZOOM = 9
 
 // Route styling — muted gray for the fast route, confident teal for the safe one.
 export const ROUTE_COLORS = {

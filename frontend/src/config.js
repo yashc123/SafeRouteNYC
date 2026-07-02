@@ -10,14 +10,15 @@ export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 // Dark basemap style (from Phase 0).
 export const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
 
-// Default view: framed on the whole island so ALL of Manhattan (Inwood in the
-// north down to the Battery in the south) is visible on load, with a little
-// margin. Center is the island's N-S midpoint; z10.5 fits ~20 km end-to-end in a
-// typical window. Starting zoomed-out like this also means fitBounds only has to
-// zoom IN (never make a big zoom-out) to frame a long route, which is what keeps
-// full-island route framing smooth. [lng, lat] order for MapLibre.
+// Default view: centered on the island's N-S midpoint and zoomed so Manhattan is
+// the dominant subject. At z11 (~29 m/px) a typical window shows ~23-29 km top to
+// bottom, so the ~20 km island fills most of the frame while staying fully visible
+// tip-to-tip, with only a modest band of surrounding NJ/Brooklyn/Queens (Manhattan
+// is narrow, so some surroundings are unavoidable). z10.5 was correct but too wide
+// (island read as a sliver on large monitors). This is still zoomed-out enough that
+// fitBounds only zooms IN to frame a long route, keeping that smooth. [lng, lat].
 export const MANHATTAN_CENTER = [-73.965, 40.79]
-export const INITIAL_ZOOM = 10.5
+export const INITIAL_ZOOM = 11
 
 // Manhattan is long and narrow, so any full-island view unavoidably includes some
 // NJ/Brooklyn/Queens. Rather than fight that with tight view limits (which clamp and

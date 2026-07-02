@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from database import get_connection
-from routing import DEFAULT_SAFE_ALPHA, VALID_TIMES, router
+from routing import DEFAULT_BUDGET_MIN, DEFAULT_SAFE_ALPHA, VALID_TIMES, router
 
 
 @asynccontextmanager
@@ -211,3 +211,32 @@ def route(req: RouteRequest):
         raise HTTPException(status_code=422, detail="No walking path between origin and destination.")
 
     return {"time_of_day": tod, "safe_alpha": req.alpha, **routes}
+
+
+@app.get("/reachable")
+def reachable(
+    lat: float,
+    lng: float,
+    time_of_day: str = "night",
+    alpha: float = DEFAULT_SAFE_ALPHA,
+    budget_min: float = DEFAULT_BUDGET_MIN,
+):
+    """Reachable-area (isochrone-like) polygon: everywhere reachable on foot from
+    (lat, lng) within a `budget_min` walk-time budget under the safety-weighted
+    cost model. Returns a GeoJSON polygon plus the reachable-node count. Raising
+    alpha or using a riskier time_of_day contracts the area.
+    """
+    if not router.ready:
+        raise HTTPException(
+            status_code=503,
+            detail="Routing graph not loaded. Ensure Phases 1-3 have run, then restart the API.",
+        )
+    tod = time_of_day.lower()
+    if tod not in VALID_TIMES:
+        raise HTTPException(status_code=422, detail=f"time_of_day must be one of {list(VALID_TIMES)}.")
+    if alpha < 0:
+        raise HTTPException(status_code=422, detail="alpha must be >= 0.")
+    if budget_min <= 0:
+        raise HTTPException(status_code=422, detail="budget_min must be > 0.")
+
+    return router.reachable_area((lat, lng), alpha, tod, budget_min)

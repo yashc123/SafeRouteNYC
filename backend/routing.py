@@ -28,6 +28,9 @@ import networkx as nx
 import numpy as np
 from pyproj import Transformer
 from scipy.spatial import cKDTree
+from shapely import concave_hull
+from shapely.geometry import MultiPoint, mapping
+from shapely.ops import transform as shapely_transform
 
 from database import get_connection
 
@@ -52,6 +55,16 @@ SAFETY_SCORE_PENALTY_REF = 1.5
 ROUTING_SRID = 32618
 
 VALID_TIMES = ("day", "evening", "night")
+
+# ---- Reachability (Phase 5) constants -------------------------------------
+# Default walk-time budget in minutes for the reachable-area query.
+DEFAULT_BUDGET_MIN = 15.0
+
+# Concave-hull tightness for turning reached nodes into a region. shapely's ratio
+# is in [0, 1]: 1 == convex hull (simple but overstates reach, bridging across
+# unreachable pockets); lower == more concave, hugging the true reachable extent.
+# 0.4 hugs the shape without producing ragged slivers.
+CONCAVE_HULL_RATIO = 0.4
 
 
 def _haversine_m(lat1, lon1, lat2, lon2):
@@ -141,6 +154,19 @@ class Router:
         lon2, lat2 = self.coords[target]
         return _haversine_m(lat1, lon1, lat2, lon2)
 
+    # -- shared cost model ---------------------------------------------------
+    def _edge_cost_fn(self, alpha, time_of_day):
+        """The Phase 4 cost model as a NetworkX weight function:
+            edge_cost = length_m * (1 + alpha * penalty[time]).
+        Shared by A* routing AND Dijkstra reachability so both respect exactly the
+        same safety-weighted, time-of-day-aware costs."""
+        pen_key = f"pen_{time_of_day}"
+
+        def weight(u, v, data):
+            return data["length"] * (1.0 + alpha * data[pen_key])
+
+        return weight
+
     # -- single route --------------------------------------------------------
     def route(self, origin, dest, alpha, time_of_day):
         """Compute one route. origin/dest are (lat, lng). Returns a dict with
@@ -148,9 +174,7 @@ class Router:
         src = self.snap(*origin)
         dst = self.snap(*dest)
         pen_key = f"pen_{time_of_day}"
-
-        def weight(u, v, data):
-            return data["length"] * (1.0 + alpha * data[pen_key])
+        weight = self._edge_cost_fn(alpha, time_of_day)
 
         path = nx.astar_path(self.G, src, dst, heuristic=self._heuristic, weight=weight)
 
@@ -191,6 +215,56 @@ class Router:
             "fast": self.route(origin, dest, 0.0, time_of_day),
             "safe": self.route(origin, dest, safe_alpha, time_of_day),
         }
+
+    # -- reachability (Dijkstra outward from origin) -------------------------
+    def reachable_area(self, origin, alpha, time_of_day, budget_min):
+        """"Where can I safely get from here within a walk-time budget?"
+
+        Single-source Dijkstra over the SAME cost model as routing, capped by a
+        cutoff. No target — we grow outward in all directions until the budget is
+        spent (that's why this is Dijkstra, not A*: there's nothing to aim a
+        heuristic at). Higher alpha and riskier (e.g. night) segments cost more,
+        so the reachable region contracts.
+        """
+        src = self.snap(*origin)
+        # Time budget -> cost budget in the model's units (safety-weighted meters).
+        budget_cost = budget_min * 60.0 * WALKING_SPEED_MPS
+        weight = self._edge_cost_fn(alpha, time_of_day)
+
+        # {node: cumulative cost}; cutoff prunes anything beyond the budget.
+        costs = nx.single_source_dijkstra_path_length(
+            self.G, src, cutoff=budget_cost, weight=weight
+        )
+        reached_pts = [self.coords[n] for n in costs]  # (lon, lat)
+
+        hull = self._reachable_hull(reached_pts)
+        area_m2 = self._polygon_area_m2(hull) if hull is not None else 0.0
+
+        return {
+            "origin_node": src,
+            "snapped_origin": {"lat": self.coords[src][1], "lng": self.coords[src][0]},
+            "alpha": alpha,
+            "time_of_day": time_of_day,
+            "budget_min": budget_min,
+            "budget_cost_m": round(budget_cost, 1),
+            "reachable_node_count": len(costs),
+            "area_m2": round(area_m2, 1),
+            "geometry": mapping(hull) if hull is not None else None,
+        }
+
+    def _reachable_hull(self, points):
+        """Concave hull (alpha shape) around the reached nodes. Concave hugs the
+        true reachable extent; a convex hull would bridge across unreachable
+        pockets and overstate reach. Falls back to convex hull for tiny sets."""
+        if len(points) < 3:
+            return MultiPoint(points).convex_hull if points else None
+        multipoint = MultiPoint(points)
+        return concave_hull(multipoint, ratio=CONCAVE_HULL_RATIO)
+
+    def _polygon_area_m2(self, geom):
+        """Area in square meters (project lon/lat -> UTM before measuring)."""
+        projected = shapely_transform(self._proj.transform, geom)
+        return projected.area
 
 
 # Module-level singleton loaded at app startup.

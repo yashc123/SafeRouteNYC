@@ -41,7 +41,7 @@ desktop.ini
 .idea/
 *.swp
 
-# ---- Claude Code (machine-local settings) ----
+# ---- Local tool settings ----
 .claude/settings.local.json
 
 # ---- SafeRouteNYC data cache (downloaded OSM graph + OSMnx HTTP cache; large, re-downloadable) ----

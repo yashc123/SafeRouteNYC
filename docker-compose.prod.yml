@@ -1,0 +1,75 @@
+# SafeRouteNYC — single-instance PRODUCTION stack: PostGIS + Redis + FastAPI + nginx(frontend).
+# This is SEPARATE from docker-compose.yml (local dev), which still works unchanged.
+#
+# Bring it up (from the repo root, with a filled-in .env.prod):
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# --env-file .env.prod is REQUIRED — it provides the ${...} values used below
+# (db credentials + the frontend build args).
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: saferoutenyc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # No published ports: only the backend (same network) reaches the DB.
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: saferoutenyc-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # No published ports: internal cache only.
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: saferoutenyc-backend
+    container_name: saferoutenyc-backend
+    restart: unless-stopped
+    # Inject all backend secrets/config (DATABASE_URL, REDIS_URL, ANTHROPIC_API_KEY,
+    # MAPTILER_KEY, ...) from the prod env file.
+    env_file:
+      - .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # No published ports: nginx reaches it as backend:8000 on the internal network.
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # Vite bakes these into the static bundle at build time.
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_MAPTILER_KEY: ${VITE_MAPTILER_KEY}
+    image: saferoutenyc-frontend
+    container_name: saferoutenyc-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80" # the single public entry point
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

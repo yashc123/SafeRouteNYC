@@ -1,9 +1,11 @@
 # ---- Environment / secrets ----
 # Ignore all real .env files anywhere in the repo, but keep the committed templates.
 .env
+.env.prod
 .env.local
 .env.*.local
 !.env.example
+!.env.prod.example
 
 # ---- Python ----
 venv/

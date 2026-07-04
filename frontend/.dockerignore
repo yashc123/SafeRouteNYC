@@ -1,0 +1,4 @@
+# Fresh install in-image; never bake local build output or the local .env key.
+node_modules
+dist
+.env

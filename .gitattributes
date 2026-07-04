@@ -1,0 +1,3 @@
+# Files consumed by Linux/Docker at deploy time must stay LF, even when edited on
+# Windows — a CRLF shell script fails on the server ("bad interpreter").
+*.sh text eol=lf

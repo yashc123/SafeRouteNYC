@@ -8,13 +8,15 @@ SafeRouteNYC is a safety-aware pedestrian routing platform for Manhattan that co
 
 The safe route (teal) diverges from the fastest route (gray), trading a little distance for a meaningfully higher safety score, with a transparent breakdown of why.
 
-![SafeRouteNYC routing — safe route vs. fast route with comparison and score breakdown](docs/routing.png)
+<img width="1360" height="896" alt="image" src="https://github.com/user-attachments/assets/622d1568-b48c-4b85-a4b7-a004dc44818a" />
+
 
 ### Explore mode — area safety lookup
 
 Tap anywhere in Manhattan for a grounded safety assessment of that area — overall score, incident density, lighting, and an honest note on data coverage.
 
-![SafeRouteNYC Explore mode — tap-anywhere area safety lookup](docs/explore.png)
+<img width="1153" height="912" alt="image" src="https://github.com/user-attachments/assets/419c6bf3-36d5-4a34-a57e-dc8a3da5cf27" />
+
 
 ---
 

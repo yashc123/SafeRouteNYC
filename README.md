@@ -2,7 +2,7 @@
 
 **Live app: [saferoutenyc.com](http://saferoutenyc.com)**
 
-SafeRouteNYC is a safety-aware pedestrian routing platform for Manhattan that computes walking routes optimized for safety rather than just distance, using real NYC open data. It combines a geospatial data pipeline, a safety-scoring model built from crime, lighting, and infrastructure data, graph-based pathfinding (A\* and Dijkstra), a three-tier caching layer, and a grounded natural-language agent — served through a responsive map interface. Every safety score is derived from real data; the app never invents a value.
+SafeRouteNYC is a safety-aware pedestrian routing platform for Manhattan that computes walking routes optimized for safety rather than just distance, using real NYC open data. It combines a geospatial data pipeline, a safety-scoring model built from crime, lighting, and infrastructure data, graph-based pathfinding (A\* and Dijkstra), a three-tier caching layer, and a grounded natural-language agent served through a responsive map interface. Every safety score is derived from real data; the app never invents a value.
 
 ### Safety-optimized routing
 
@@ -13,7 +13,7 @@ The safe route (teal) diverges from the fastest route (gray), trading a little d
 
 ### Explore mode — area safety lookup
 
-Tap anywhere in Manhattan for a grounded safety assessment of that area — overall score, incident density, lighting, and an honest note on data coverage.
+Tap anywhere in Manhattan for a grounded safety assessment of that area : overall score, incident density, lighting, and an honest note on data coverage.
 
 <img width="1153" height="912" alt="image" src="https://github.com/user-attachments/assets/419c6bf3-36d5-4a34-a57e-dc8a3da5cf27" />
 
@@ -26,11 +26,11 @@ Tap anywhere in Manhattan for a grounded safety assessment of that area — over
 
 **Time-of-Day Awareness** — Safety scores are bucketed by time of day (day / evening / night), so routes and area assessments reflect that the same street carries different risk at 2pm versus 2am.
 
-**Explore Mode (Area Safety Lookup)** — Tap anywhere in Manhattan to get a grounded safety assessment for that area — incident density, lighting, and an overall score — without needing a full route.
+**Explore Mode (Area Safety Lookup)** — Tap anywhere in Manhattan to get a grounded safety assessment for that area : incident density, lighting, and an overall score without needing a full route.
 
 **Reachability Analysis** — A Dijkstra-based reachability computation answers "how far can I safely get from here in N minutes," building a reachable-area polygon under a safety-weighted cost budget.
 
-**Grounded Natural-Language Agent** — An "Ask SafeRouteNYC" box accepts plain-English requests ("safest way home to the East Village from Times Square at 1am"). A Claude-powered tool-using agent decomposes the request, calls the real routing/geocoding/area-safety functions, and explains the result — reporting only values the real engine computed, never inventing safety numbers.
+**Grounded Natural-Language Agent** — An "Ask SafeRouteNYC" box accepts plain-English requests ("safest way home to the East Village from Times Square at 1am"). A Claude-powered tool-using agent decomposes the request, calls the real routing/geocoding/area-safety functions, and explains the result, reporting only values the real engine computed, never inventing safety numbers.
 
 **Transparent Scoring** — Every route surfaces a "why this route" breakdown (incident density, lighting coverage, time factor) so the safety score is explainable rather than a black box, including honest "limited data" notes where lighting coverage is sparse.
 

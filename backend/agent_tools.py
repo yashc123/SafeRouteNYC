@@ -1,4 +1,4 @@
-"""Agent tools — thin wrappers over SafePath's EXISTING engine functions.
+"""Agent tools — thin wrappers over SafeRouteNYC's EXISTING engine functions.
 
 No routing/scoring logic is reimplemented here. Each tool calls code we already
 have (router.route_pair / router.area_safety / router.reachable_area, and a

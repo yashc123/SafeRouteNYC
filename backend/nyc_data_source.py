@@ -51,7 +51,7 @@ DEFAULT_YEARS = 3
 DEFAULT_BOROUGH = "MANHATTAN"
 
 _SOCRATA_PAGE_SIZE = 50000  # Socrata's max rows per request; we page past it.
-_USER_AGENT = "SafePath/0.1 (walking-safety routing; dev)"
+_USER_AGENT = "SafeRouteNYC/0.1 (walking-safety routing; dev)"
 
 
 def _window_start(years: int) -> str:

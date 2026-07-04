@@ -111,7 +111,7 @@ export default function App() {
 
       {outOfBounds && (
         <div className="oob-toast">
-          SafePath currently covers Manhattan — please pick a point on the island.
+          SafeRouteNYC currently covers Manhattan — please pick a point on the island.
         </div>
       )}
 

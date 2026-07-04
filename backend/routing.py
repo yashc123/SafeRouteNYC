@@ -1,4 +1,4 @@
-"""SafePath routing engine (Phase 4).
+"""SafeRouteNYC routing engine (Phase 4).
 
 Turns the per-segment safety weights (edge_safety) into actual walking routes.
 

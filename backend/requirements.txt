@@ -1,4 +1,4 @@
-# SafePath backend dependencies — pinned for reproducible builds (now and on AWS).
+# SafeRouteNYC backend dependencies — pinned for reproducible builds (now and on AWS).
 # Web framework + ASGI server
 fastapi==0.115.6
 uvicorn[standard]==0.34.0

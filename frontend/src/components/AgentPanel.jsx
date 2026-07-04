@@ -13,7 +13,7 @@ export default function AgentPanel({ onAsk, loading, answer, error }) {
 
   return (
     <form className="agent-panel" onSubmit={submit}>
-      <span className="control-label">Ask SafePath</span>
+      <span className="control-label">Ask SafeRouteNYC</span>
       <textarea
         className="agent-input"
         rows={2}

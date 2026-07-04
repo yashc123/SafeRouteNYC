@@ -1,6 +1,6 @@
-"""SafePath backend — city data source interface.
+"""SafeRouteNYC backend — city data source interface.
 
-This abstract base class is SafePath's extensibility seam. All city-specific data
+This abstract base class is SafeRouteNYC's extensibility seam. All city-specific data
 access (crime points, streetlights, outages, street graph) is defined here as an
 abstract contract with NO implementation.
 

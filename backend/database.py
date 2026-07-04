@@ -1,4 +1,4 @@
-"""SafePath backend — PostgreSQL connection setup.
+"""SafeRouteNYC backend — PostgreSQL connection setup.
 
 Phase 0: connection wiring ONLY. No tables, no migrations, no queries.
 Later phases import `get_connection()` (or the pool directly) to talk to the

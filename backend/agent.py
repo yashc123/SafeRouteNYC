@@ -1,4 +1,4 @@
-"""SafePath agent — a SINGLE Claude tool-using agent (not multi-agent).
+"""SafeRouteNYC agent — a SINGLE Claude tool-using agent (not multi-agent).
 
 The loop is the standard Anthropic function-calling cycle:
   1. Send the user message + tool definitions to Claude.
@@ -28,11 +28,11 @@ MODEL = "claude-sonnet-5"
 MAX_STEPS = 8       # safety cap on tool-use round trips
 MAX_TOKENS = 1024
 
-SYSTEM_PROMPT = """You are SafePath's assistant. You help people plan safer walking \
+SYSTEM_PROMPT = """You are SafeRouteNYC's assistant. You help people plan safer walking \
 routes and check area safety in Manhattan, New York. You are a single assistant that \
 uses tools — not a team of agents.
 
-You have tools that call SafePath's REAL routing engine:
+You have tools that call SafeRouteNYC's REAL routing engine:
 - geocode(place_name): resolve a place/address to coordinates.
 - get_route(origin, destination, alpha, time_of_day): returns BOTH a safe and a fast route.
 - get_area_safety(lat, lng, time_of_day): safety profile of the area around a point.

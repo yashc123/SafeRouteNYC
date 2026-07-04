@@ -1,4 +1,4 @@
-"""SafePath tier-3 cache: Redis-backed cache of full /route and /reachable results.
+"""SafeRouteNYC tier-3 cache: Redis-backed cache of full /route and /reachable results.
 
 Where this sits in the three-tier caching architecture:
   Tier 1 - PostGIS edge_safety: the expensive per-segment geospatial join +

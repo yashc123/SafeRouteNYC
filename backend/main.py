@@ -1,4 +1,4 @@
-"""SafePath backend — FastAPI application entrypoint.
+"""SafeRouteNYC backend — FastAPI application entrypoint.
 
 Endpoints: /health, /graph/stats (Phase 1), /segment/{id}/safety (Phase 3),
 POST /route (Phase 4), GET /reachable (Phase 5). Phase 6 adds the tier-3 Redis
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SafePath API", version="0.0.0", lifespan=lifespan)
+app = FastAPI(title="SafeRouteNYC API", version="0.0.0", lifespan=lifespan)
 
 # CORS origins come from env (comma-separated), defaulting to the Vite dev server.
 _cors_origins = [

@@ -1,4 +1,4 @@
-# SafePath local infrastructure: PostGIS database + Redis cache.
+# SafeRouteNYC local infrastructure: PostGIS database + Redis cache.
 
 services:
   db:

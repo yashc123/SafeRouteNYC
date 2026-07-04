@@ -1,5 +1,13 @@
 # SafeRouteNYC
 
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
+![PostGIS](https://img.shields.io/badge/PostGIS-336791?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS_EC2-FF9900?logo=amazonaws&logoColor=white)
+
 **Live app: [saferoutenyc.com](http://saferoutenyc.com)**
 
 SafeRouteNYC is a safety-aware pedestrian routing platform for Manhattan that computes walking routes optimized for safety rather than just distance, using real NYC open data. It combines a geospatial data pipeline, a safety-scoring model built from crime, lighting, and infrastructure data, graph-based pathfinding (A\* and Dijkstra), a three-tier caching layer, and a grounded natural-language agent served through a responsive map interface. Every safety score is derived from real data; the app never invents a value.

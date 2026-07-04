@@ -83,7 +83,7 @@ The system is split into an **offline preprocessing** stage (expensive, run once
 
 Raw open data becomes a safety model here. Three data sources are ingested asynchronously and joined against the street graph via a cKDTree spatial index (O(log n) nearest-segment lookups instead of brute force).
 
-**The coordinate-truncation fix:** NYPD publishes incident coordinates truncated to block level, so a naive join leaves most segments with no data. Each incident's weight is spread across nearby segments within a 65m radius, distance-weighted and normalized so the total signal is conserved rather than inflated — raising crime coverage from ~9.6% to ~91.8% of segments while keeping the aggregate incident count exact.
+**The coordinate-truncation fix:** NYPD publishes incident coordinates truncated to block level, so a naive join leaves most segments with no data. Each incident's weight is spread across nearby segments within a 65m radius, distance-weighted and normalized so the total signal is conserved rather than inflated, raising crime coverage from ~9.6% to ~91.8% of segments while keeping the aggregate incident count exact.
 
 **Lighting** uses the same proximity approach within a smaller radius, with a neutral fallback for segments lacking lamp data, so missing lighting is never misread as "dangerous."
 
@@ -101,13 +101,13 @@ Each tier avoids a different kind of expensive recomputation:
 
 - **Tier 1 — PostGIS:** precomputed safety weights, so the geospatial join is never redone at request time.
 - **Tier 2 — In-memory graph:** the weighted graph is held in RAM, so A\* never round-trips to the database for edge weights during a search.
-- **Tier 3 — Redis:** full route/area results are cached, keyed on snapped node IDs (so near-identical clicks share a cache entry). The cache is fail-safe — if Redis is unavailable, the app degrades to direct computation rather than erroring.
+- **Tier 3 — Redis:** full route/area results are cached, keyed on snapped node IDs (so near-identical clicks share a cache entry). The cache is fail-safe, so if Redis is unavailable, the app degrades to direct computation rather than erroring.
 
 Measured on the deployed server: a full cross-Manhattan route computes in **~357ms cold** and returns in **~72ms warm** from cache — roughly a **5× speedup** on repeat routes.
 
 ### 4. Agent Layer
 
-A single Claude-powered tool-using agent wraps the existing functions (geocode, get_route, get_area_safety) as tools. It decomposes a natural-language request into a sequence of tool calls and explains the result. A strict grounding rule — enforced in the system prompt and by only surfacing tool-returned data — means the agent never generates safety values itself; it translates language and reports real computed numbers.
+A single Claude-powered tool-using agent wraps the existing functions (geocode, get_route, get_area_safety) as tools. It decomposes a natural-language request into a sequence of tool calls and explains the result. A strict grounding rulee is enforced in the system prompt and by only surfacing tool-returned data means the agent never generates safety values itself; it translates language and reports real computed numbers.
 
 ---
 
@@ -139,7 +139,7 @@ This single-instance approach matches the project's scale and is simpler and mor
 ## Limitations
 
 - Coverage is Manhattan-only; the architecture supports additional boroughs via a `CityDataSource` interface, with in-memory graph RAM being the main scaling consideration.
-- NYPD coordinates are block-level, so the safety model reflects area-level risk, not exact incident locations — the proximity-spreading approach is an honest response to this, not a claim of precise placement.
+- NYPD coordinates are block-level, so the safety model reflects area-level risk, not exact incident locations; the proximity-spreading approach is an honest response to this, not a claim of precise placement.
 
 ---
 

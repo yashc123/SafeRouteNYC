@@ -140,23 +140,6 @@ This single-instance approach matches the project's scale and is simpler and mor
 
 - Coverage is Manhattan-only; the architecture supports additional boroughs via a `CityDataSource` interface, with in-memory graph RAM being the main scaling consideration.
 - NYPD coordinates are block-level, so the safety model reflects area-level risk, not exact incident locations — the proximity-spreading approach is an honest response to this, not a claim of precise placement.
-- Lighting data is sparse (streetlamp coverage on a minority of segments), so lighting contributes where available and falls back to neutral elsewhere, with this surfaced transparently in the UI.
-- The app serves over HTTP; HTTPS can be added by fronting the stack with a TLS-terminating proxy.
 
 ---
 
-## Architecture Summary
-
-```
-Offline:  OSM street graph ─┐
-          NYPD crime ───────┤
-          OSM streetlamps ──┼─▶ cKDTree spatial join ─▶ safety scoring ─▶ PostGIS
-          311 outages ──────┘        (proximity-spread,   (per-segment,
-                                       signal-conserving)   time-bucketed)
-
-Online:   request ─▶ Redis? ─hit─▶ result
-                       │
-                       └─miss─▶ A* / Dijkstra over in-memory weighted graph ─▶ cache ─▶ GeoJSON ─▶ MapLibre
-
-Agent:    natural language ─▶ Claude tool-use loop ─▶ [geocode | get_route | get_area_safety] ─▶ grounded answer
-```

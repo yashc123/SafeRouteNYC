@@ -74,7 +74,7 @@ The system is split into an **offline preprocessing** stage (expensive, run once
 
 1. **Street graph** — Manhattan's walkable network is pulled via OSMnx into a graph of ~36,000 nodes (intersections) and ~115,000 edges (street segments).
 2. **Data ingestion** — ~340,000 NYPD crime incidents (a 3-year window), ~5,000 OpenStreetMap streetlamps, and ~14,600 NYC 311 outage reports are ingested from their respective APIs.
-3. **Geospatial join + scoring** — Each incident and streetlamp is snapped to its nearest street segment using a cKDTree spatial index. Because NYPD truncates incident coordinates to block level, each incident's weight is spread across nearby segments within a fixed radius (distance-weighted and signal-conserving), which raises crime coverage from ~10% of segments to ~92%. Each segment gets a normalized incident-density and lighting score, bucketed by time of day, combined into a signed safety weight.
+3. **Geospatial join + scoring** — Each incident and streetlamp is snapped to its nearest street segment using a cKDTree spatial index. Because NYPD truncates incident coordinates to block level, each incident's weight is spread across nearby segments within a fixed radius (distance-weighted and signal-conserving), which raises crime coverage from ~60% of segments to ~92%. Each segment gets a normalized incident-density and lighting score, bucketed by time of day, combined into a signed safety weight.
 4. **Persistence** — All computed safety weights are stored back into PostGIS.
 
 **Online (per request):**
@@ -138,7 +138,7 @@ This single-instance approach matches the project's scale and is simpler and mor
 |---|---|
 | Street graph | ~36,000 nodes / ~115,000 edges |
 | Crime incidents ingested | ~340,000 (3-year window) |
-| Crime coverage after proximity-spreading | ~9.6% → ~91.8% of segments |
+| Crime coverage after proximity-spreading | ~59.6% → ~91.8% of segments |
 | Streetlamps / 311 outage reports | ~5,000 / ~14,600 |
 | Cache speedup (long route) | ~5× (~357ms → ~72ms, measured on deployed server) |
 
